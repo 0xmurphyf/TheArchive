@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Archive — Museum Whisper</title>
+<style>
+:root{
+  --bg:#0a0a08;
+  --paper:#e7e1d2;
+  --dim:#989183;
+  --line:rgba(231,225,210,.14);
+  --accent:#9a8060;
+  --danger:#9a5e55;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--paper);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:clamp(12px,0.45vw + 0.35vh,15px);
+  overflow-x:hidden
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:999;
+  background:
+    radial-gradient(circle at 30% 20%,rgba(154,128,96,.05),transparent 30%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.01) 0 1px,transparent 1px 4px);
+  mix-blend-mode:screen
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+header{
+  height:68px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 5vw;border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:30;background:rgba(10,10,8,.9);backdrop-filter:blur(14px)
+}
+.brand{background:none;border:0;color:var(--paper);letter-spacing:.18em;font-size:13px}
+nav{display:flex;gap:20px;align-items:center}
+nav button{background:none;border:0;color:var(--dim)}
+.wallet{border:1px solid var(--line)!important;padding:9px 13px!important;color:var(--paper)!important}
+.view{display:none}.view.active{display:block}
+
+.hero{
+  min-height:86vh;display:grid;place-items:center;padding:80px 24px;text-align:center;
+  position:relative;overflow:hidden
+}
+.hero:after{
+  content:"";position:absolute;inset:0;background:radial-gradient(circle at center,rgba(255,255,255,.025),transparent 45%);
+  pointer-events:none
+}
+.eyebrow{font:11px "Courier New",monospace;letter-spacing:.28em;color:var(--accent)}
+h1,h2,h3{font-family:Georgia,serif;font-weight:400}
+h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spacing:-.045em}
+.hero-lines{display:flex;flex-direction:column;gap:12px;font-family:Georgia,serif;font-size:clamp(16px,1.9vw,25px)}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:40px}
+.btn{border:1px solid var(--line);background:transparent;color:var(--paper);padding:13px 18px}
+.btn.primary{background:var(--paper);color:#111}
+.btn.danger{border-color:var(--danger);color:#d9b7b0}
+
+.section{padding:72px 4vw}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:32px}
+.section-head h2{font-size:clamp(30px,3.2vw,40px);margin:0}
+.section-head p{max-width:540px;color:var(--dim);line-height:1.7}
+
+.whisper-stage{
+  position:relative;min-height:88vh;height:min(94vh,980px);overflow:hidden;container-type:size;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,255,255,.018),transparent 42%)
+}
+.whisper{
+  position:absolute;max-width:min(520px,88cqw);background:none;border:0;color:var(--paper);
+  text-align:center;padding:0;opacity:0;filter:blur(12px);
+  transform:translateY(28px) scale(.955);
+  transition:opacity .9s ease, filter .9s ease, transform .9s ease;
+  will-change:opacity,filter,transform;
+}
+.whisper.visible{
+  opacity:1;
+  filter:blur(0);
+  transform:translateY(0) scale(1);
+}
+.whisper.leaving{
+  opacity:0;
+  filter:blur(12px);
+  transform:translateY(-26px) scale(.96);
+}
+.whisper:hover{filter:blur(0)!important;opacity:1!important;transform:scale(1.03)!important}
+.whisper q{font-family:Georgia,serif;font-size:clamp(14px,2.2cqw,22px);line-height:1.4;quotes:"“" "”"}
+.whisper-meta{margin-top:14px;color:var(--dim);font:11px "Courier New",monospace;letter-spacing:.08em;text-align:center}
+
+
+.archive-list{border-top:1px solid var(--line)}
+.archive-row{
+  width:100%;display:grid;grid-template-columns:120px 1.15fr 1fr 140px;
+  gap:18px;align-items:center;padding:18px 0;border:0;border-bottom:1px solid var(--line);
+  background:none;color:inherit;text-align:left
+}
+.archive-row:hover{background:rgba(255,255,255,.018)}
+.archive-id,.muted{color:var(--dim)}
+.archive-title{font-family:Georgia,serif;font-size:clamp(17px,1.5vw,20px)}
+
+.detail{
+  min-height:calc(100vh - 68px);display:grid;grid-template-columns:1.1fr .9fr
+}
+.artifact{
+  min-height:760px;padding:40px;display:flex;align-items:flex-end;
+  background:
+    linear-gradient(rgba(0,0,0,.1),rgba(0,0,0,.62)),
+    radial-gradient(circle at 55% 35%,rgba(154,128,96,.18),transparent 28%),
+    linear-gradient(145deg,#2b2923,#0d0d0b);
+  border-right:1px solid var(--line)
+}
+.artifact h2{font-size:50px;margin:8px 0}
+.detail-panel{padding:56px;text-align:center}
+.memory{font-family:Georgia,serif;font-size:clamp(20px,2vw,26px);line-height:1.48}
+.label{font:11px "Courier New",monospace;letter-spacing:.18em;color:var(--accent);margin-top:28px}
+.detail-line{display:grid;grid-template-columns:130px 1fr;gap:18px;padding:12px 0;border-bottom:1px solid var(--line);text-align:left}
+
+.wizard{max-width:1050px;margin:0 auto;padding:50px 24px 90px}
+.progress{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0 32px}
+.progress i{height:2px;background:#312f2a}.progress i.on{background:var(--paper)}
+.step{display:none;border:1px solid var(--line);padding:34px;background:rgba(255,255,255,.012)}
+.step.active{display:block}
+.step h2{font-size:clamp(30px,3vw,38px);margin:0 0 8px}
+.step p{color:var(--dim);line-height:1.7}
+.object-grid,.storage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
+.option{
+  border:1px solid var(--line);background:#11110e;color:var(--paper);
+  min-height:170px;padding:18px;text-align:left
+}
+.option.selected{border-color:var(--paper)}
+.object-thumb{height:100px;display:grid;place-items:center;background:#1c1b17;color:var(--accent);margin-bottom:14px}
+.field{margin:20px 0}
+.field label{display:block;margin-bottom:8px;color:var(--dim);font-size:12px}
+textarea,input[type=text]{width:100%;background:#0f0f0d;border:1px solid var(--line);color:var(--paper);padding:14px}
+textarea{min-height:140px}
+.step-footer{display:flex;justify-content:space-between;gap:12px;margin-top:26px}
+.warning{padding:18px;border:1px solid rgba(154,94,85,.45);color:#d8b8b1;line-height:1.75}
+.fee-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}
+.success{text-align:center;padding:70px 20px}
+.seal{width:88px;height:88px;border:1px solid var(--paper);border-radius:50%;display:grid;place-items:center;margin:0 auto 24px;font-family:Georgia,serif;font-size:34px}
+.toast{position:fixed;right:24px;bottom:24px;border:1px solid var(--line);background:#151510;padding:13px 16px;display:none;z-index:40}
+
+
+/* v7 experiential details */
+.whisper.kind-nft{animation:driftNFT 18s ease-in-out infinite}
+.whisper.kind-coin{animation:driftCoin 10s ease-in-out infinite}
+.whisper.kind-badge{animation:driftBadge 24s ease-in-out infinite}
+.whisper.kind-game{animation:driftGame 15s ease-in-out infinite}
+@keyframes driftNFT{0%,100%{margin-left:0;margin-top:0}50%{margin-left:4px;margin-top:-3px}}
+@keyframes driftCoin{0%,100%{margin-left:0}50%{margin-left:3px}}
+@keyframes driftBadge{0%,100%{margin-top:0}50%{margin-top:-1px}}
+@keyframes driftGame{0%,100%{margin-left:0;margin-top:0}50%{margin-left:-3px;margin-top:2px}}
+
+.memory-mask{display:inline}
+.memory-mask .hidden-word{
+  display:inline-block;
+  filter:blur(5px);
+  opacity:.25;
+  transition:filter .45s ease,opacity .45s ease
+}
+.whisper.visible .memory-mask .hidden-word{filter:blur(0);opacity:1}
+
+.silence-note{
+  position:absolute;inset:0;display:grid;place-items:center;
+  color:rgba(231,225,210,.28);font:11px "Courier New",monospace;letter-spacing:.18em;
+  opacity:0;transition:opacity 1s ease;pointer-events:none
+}
+.silence-note.show{opacity:1}
+
+.detail-transition{
+  position:fixed;inset:0;background:rgba(10,10,8,.96);z-index:80;
+  display:grid;place-items:center;opacity:0;pointer-events:none;
+  transition:opacity .45s ease
+}
+.detail-transition.show{opacity:1;pointer-events:auto}
+.detail-transition q{
+  max-width:min(720px,80vw);font-family:Georgia,serif;
+  font-size:clamp(24px,4vw,48px);line-height:1.35;text-align:center;
+  transform:scale(.82);transition:transform 2.2s ease
+}
+.detail-transition.show q{transform:scale(1.12)}
+
+.detail{position:relative}
+.detail-panel.message-first{display:flex;flex-direction:column;justify-content:center}
+.artifact{
+  opacity:0;filter:blur(14px);transform:scale(.985);
+  transition:opacity 1.1s ease,filter 1.1s ease,transform 1.1s ease
+}
+.artifact.revealed{opacity:1;filter:blur(0);transform:scale(1)}
+.memory{font-size:clamp(28px,3.2vw,46px);line-height:1.36}
+.archive-ending{
+  margin-top:44px;padding-top:22px;border-top:1px solid var(--line);
+  font-family:Georgia,serif;font-size:clamp(18px,1.8vw,25px);line-height:1.6
+}
+.archive-ending span{display:block}
+
+.visitor-book{
+  margin-top:42px;padding-top:30px;border-top:1px solid var(--line);text-align:left
+}
+.visitor-book h3{font-size:30px;margin:0 0 8px}
+.visitor-book p{color:var(--dim)}
+.visitor-form{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:18px}
+.visitor-form input{width:100%;background:#0f0f0d;border:1px solid var(--line);color:var(--paper);padding:13px}
+.visitor-list{margin-top:20px;display:grid;gap:10px}
+.visitor-entry{
+  padding:12px 0;border-bottom:1px solid var(--line);font-family:Georgia,serif;font-size:18px
+}
+.visitor-entry small{display:block;margin-top:6px;color:var(--dim);font:10px "Courier New",monospace}
+@media(max-width:900px){
+  .visitor-form{grid-template-columns:1fr}
+  .detail-panel.message-first{min-height:auto}
+}
+
+@media(max-width:900px){
+  nav button:not(.wallet){display:none}
+  .whisper-stage{
+    min-height:86vh;height:86vh;
+    padding:30px 0;
+    overflow:hidden;
+  }
+  .whisper{
+    max-width:82vw;
+    width:82vw;
+    text-align:center;
+  }
+  .whisper q{
+    font-size:clamp(14px,4.2vw,19px);
+    line-height:1.42;
+  }
+  .archive-row{grid-template-columns:90px 1fr}
+  .archive-row .hide-mobile{display:none}
+  .detail{grid-template-columns:1fr}
+  .artifact{min-height:52vh;border-right:0}
+  .object-grid,.storage-grid{grid-template-columns:1fr}
+  .section{padding:64px 20px}
+}
+</style>
+</head>
+<body>
+<header>
+  <button class="brand" onclick="showView('home')">THE ARCHIVE</button>
+  <nav>
+    <button onclick="showView('archive')">Archive</button>
+    <button onclick="showView('home');document.getElementById('whispers').scrollIntoView()">Whispers</button>
+    <button class="wallet" id="walletBtn" onclick="toggleWallet()">Connect Wallet</button>
+  </nav>
+</header>
+
+<main>
+<section id="home" class="view active">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">THE GOOD OLD DAYS</div>
+      <h1>The<br>Archive</h1>
+      <div class="hero-lines">
+        <span>Some things should never be sold.</span>
+        <span>Some things should never be destroyed.</span>
+        <span>Some things should be left behind.</span>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="showView('archive')">Enter The Archive</button>
+        <button class="btn" onclick="startWizard()">Archive an Object</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="whispers">
+    <div class="section-head">
+      <div><div class="eyebrow">MUSEUM WHISPERS</div><h2>What remains.</h2></div>
+      <p>Messages appear before their objects. Select a voice to reveal the artifact that was left behind.</p>
+    </div>
+    <div class="whisper-stage" id="whisperStage"><div class="silence-note" id="silenceNote">THE ARCHIVE IS LISTENING</div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div><div class="eyebrow">PUBLIC RECORD</div><h2>Recent Entries</h2></div>
+      <p>A quiet register of objects that no longer have owners.</p>
+    </div>
+    <div class="archive-list" id="recentList"></div>
+  </section>
+</section>
+
+<section id="archive" class="view">
+  <section class="section">
+    <div class="section-head">
+      <div><div class="eyebrow">THE ARCHIVE</div><h2>All Entries</h2></div>
+      <p>No price. No rarity. No owner. Only what someone chose to preserve.</p>
+    </div>
+    <div class="archive-list" id="archiveList"></div>
+  </section>
+</section>
+
+<section id="detail" class="view">
+  <div class="detail">
+    <div class="artifact">
+      <div>
+        <div class="eyebrow">ARCHIVED ARTIFACT</div>
+        <h2 id="detailTitle">VOXX FILE #0042</h2>
+      </div>
+    </div>
+    <div class="detail-panel message-first">
+      <div class="eyebrow" id="detailId">ARCHIVE•240715•421</div>
+      <div class="label">MEMORY</div>
+      <div class="memory" id="detailQuote">“This was the last thing I thought I would keep forever.”</div>
+      <div class="label">SEALED BY</div>
+      <p><span id="detailBy">Murphy</span><br><span class="muted" id="detailAddress">0x9ab4...c12d</span></p>
+      <p id="detailSignature">“The world changed faster than I did.”</p>
+      <div class="label">ARCHIVED</div>
+      <p><span id="detailDate">14 Jul 2026 · 14:32 UTC</span><br><span class="muted" id="detailAge">Memory age: 1 day</span></p>
+      <div class="label">ARTIFACT</div>
+      <div class="detail-line"><span class="muted">Type</span><span id="detailType">0xabc::voxx::Voxx</span></div>
+      <div class="detail-line"><span class="muted">Status</span><span>Immutable</span></div>
+      <div class="detail-line"><span class="muted">Owner</span><span>None</span></div>
+
+      <div class="archive-ending">
+        <span>Archived forever.</span>
+        <span>No owner remains.</span>
+        <span>Only memory.</span>
+      </div>
+
+      <div class="visitor-book">
+        <div class="eyebrow">VISITOR BOOK</div>
+        <h3>Leave one sentence.</h3>
+        <p>No likes. No comments. Only a quiet acknowledgement.</p>
+        <div class="visitor-form">
+          <input id="visitorInput" type="text" maxlength="120" placeholder="I remember this.">
+          <button class="btn" onclick="addVisitorNote()">Leave note</button>
+        </div>
+        <div class="visitor-list" id="visitorList"></div>
+      </div>
+
+      <div class="actions" style="justify-content:flex-start"><button class="btn" onclick="showView('archive')">Back to Archive</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="wizard" class="view">
+  <div class="wizard">
+    <div class="eyebrow">ARCHIVE CEREMONY</div>
+    <div class="progress" id="progress"></div>
+
+    <div class="step active" data-step="1">
+      <h2>Connect your wallet</h2>
+      <p>The object must be directly owned by this wallet.</p>
+      <div class="warning">Prototype only. No real Sui transaction will occur.</div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn primary" onclick="connectWalletAndNext()">Connect Wallet</button></div>
+    </div>
+
+    <div class="step" data-step="2">
+      <h2>Choose an object</h2>
+      <p>Select one object to remove from ownership forever.</p>
+      <div class="object-grid">
+        <button class="option" onclick="selectObject(this)"><div class="object-thumb">VOXX</div><strong>VOXX File #0042</strong><p>NFT</p></button>
+        <button class="option" onclick="selectObject(this)"><div class="object-thumb">SUI</div><strong>12.40 SUI</strong><p>Coin&lt;SUI&gt;</p></button>
+        <button class="option" onclick="selectObject(this)"><div class="object-thumb">PASS</div><strong>Genesis Access Pass</strong><p>Badge</p></button>
+      </div>
+      <div class="step-footer"><button class="btn" onclick="prevStep()">Back</button><button class="btn primary" id="objectNext" onclick="nextStep()" disabled>Continue</button></div>
+    </div>
+
+    <div class="step" data-step="3">
+      <h2>Leave a message</h2>
+      <p>This message becomes part of the permanent record.</p>
+      <div class="field"><label>Message</label><textarea>This was the last thing I thought I would keep forever.</textarea></div>
+      <div class="field"><label>Signature</label><input type="text" value="The world changed faster than I did."></div>
+      <div class="step-footer"><button class="btn" onclick="prevStep()">Back</button><button class="btn primary" onclick="nextStep()">Continue</button></div>
+    </div>
+
+    <div class="step" data-step="4">
+      <h2>Choose the final image</h2>
+      <p>The image reference cannot be edited after archiving.</p>
+      <div class="storage-grid">
+        <button class="option selected" onclick="selectOption(this,4)">Use Original Image</button>
+        <button class="option" onclick="selectOption(this,4)">Upload Hero Image</button>
+        <button class="option" onclick="selectOption(this,4)">No Hero Image</button>
+      </div>
+      <div class="step-footer"><button class="btn" onclick="prevStep()">Back</button><button class="btn primary" onclick="nextStep()">Continue</button></div>
+    </div>
+
+    <div class="step" data-step="5">
+      <h2>Choose storage</h2>
+      <p>The URI and file hash become part of the immutable archive record.</p>
+      <div class="storage-grid">
+        <button class="option selected" onclick="selectOption(this,5)">Archive Hosted<br><span class="muted">0.20 SUI</span></button>
+        <button class="option" onclick="selectOption(this,5)">Independent Storage<br><span class="muted">Network quoted</span></button>
+        <button class="option" onclick="selectOption(this,5)">No Media<br><span class="muted">Free</span></button>
+      </div>
+      <div class="step-footer"><button class="btn" onclick="prevStep()">Back</button><button class="btn primary" onclick="nextStep()">Continue</button></div>
+    </div>
+
+    <div class="step" data-step="6">
+      <h2>Final confirmation</h2>
+      <div class="warning">This object cannot be transferred, sold, edited or recovered.<br>No administrator can return it.</div>
+      <div style="margin-top:22px">
+        <div class="fee-row"><span>Archive Fee</span><span>0.10 SUI</span></div>
+        <div class="fee-row"><span>Storage Fee</span><span>0.20 SUI</span></div>
+        <div class="fee-row"><span>Network Gas</span><span>Estimated</span></div>
+      </div>
+      <div class="field"><label>Type ARCHIVE to continue</label><input id="confirmText" type="text" oninput="validateConfirm()"></div>
+      <div class="step-footer"><button class="btn" onclick="prevStep()">Back</button><button class="btn danger" id="archiveBtn" onclick="completeArchive()" disabled>ARCHIVE FOREVER</button></div>
+    </div>
+
+    <div class="step" data-step="7">
+      <div class="success">
+        <div class="seal">A</div>
+        <div class="eyebrow">ARCHIVED</div>
+        <h2>This object now belongs to history.</h2>
+        <p>It no longer belongs to you. It no longer belongs to us.</p>
+        <div class="actions"><button class="btn primary" onclick="showView('detail')">View Entry</button><button class="btn" onclick="startWizard()">Archive Another</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="detail-transition" id="detailTransition"><q id="transitionQuote"></q></div><div class="toast" id="toast"></div>
+
+<script>
+const memories=[
+{id:"000421",code:"240715•421",title:"VOXX File #0042",quote:"This was the last thing I thought I would keep forever.",by:"Murphy",address:"0x9ab4...c12d",signature:"The world changed faster than I did.",date:"14 Jul 2026 · 14:32 UTC",relative:"1 day ago",age:"Memory age: 1 day",type:"0xabc::voxx::Voxx",kind:"nft"},
+{id:"000420",code:"240714•420",title:"Genesis Access Pass",quote:"Proof that I was there before the doors closed.",by:"0x7c2a...91fe",address:"0x7c2a...91fe",signature:"I kept the receipt, not the access.",date:"13 Jul 2026 · 21:08 UTC",relative:"2 days ago",age:"Memory age: 2 days",type:"0xdef::access::GenesisPass",kind:"badge"},
+{id:"000419",code:"240713•419",title:"8.20 SUI",quote:"The last coin from an older economy.",by:"Anonymous",address:"0x51fe...a209",signature:"No name left.",date:"12 Jul 2026 · 09:47 UTC",relative:"3 days ago",age:"Memory age: 3 days",type:"0x2::coin::Coin<0x2::sui::SUI>",kind:"coin"},
+{id:"000418",code:"240712•418",title:"Old World Sword",quote:"I won this in a game nobody remembers.",by:"0xaa31...0c18",address:"0xaa31...0c18",signature:"The server died before the legend did.",date:"11 Jul 2026 · 18:14 UTC",relative:"4 days ago",age:"Memory age: 4 days",type:"0x777::game::Sword",kind:"game"},
+{id:"000417",code:"240711•417",title:"SuiFrens #118",quote:"I promised I would never sell it.",by:"M.",address:"0x44cc...9a11",signature:"A promise completed by giving it away.",date:"10 Jul 2026 · 06:30 UTC",relative:"5 days ago",age:"Memory age: 5 days",type:"0x991::suifrens::SuiFren",kind:"nft"},
+{id:"000416",code:"240710•416",title:"Archive Receipt",quote:"Before identity became mandatory.",by:"0x19bf...44d2",address:"0x19bf...44d2",signature:"This was enough to prove I existed.",date:"9 Jul 2026 · 23:02 UTC",relative:"6 days ago",age:"Memory age: 6 days",type:"0x864::receipt::ArchiveReceipt",kind:"badge"}
+];
+
+
+function visitorStorageKey(){
+  return `archive-visitors-${detailId.textContent}`;
+}
+
+function renderVisitorNotes(){
+  const notes=JSON.parse(localStorage.getItem(visitorStorageKey())||"[]");
+  visitorList.innerHTML=notes.map(n=>`
+    <div class="visitor-entry">“${n.text}”
+      <small>${n.time}</small>
+    </div>
+  `).join("");
+}
+
+function addVisitorNote(){
+  const text=visitorInput.value.trim();
+  if(!text)return;
+
+  const notes=JSON.parse(localStorage.getItem(visitorStorageKey())||"[]");
+  notes.unshift({
+    text,
+    time:new Date().toLocaleString()
+  });
+
+  localStorage.setItem(visitorStorageKey(),JSON.stringify(notes.slice(0,20)));
+  visitorInput.value="";
+  renderVisitorNotes();
+  showToast("Visitor note added");
+}
+
+function showView(id){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0,0);
+}
+function openDetail(i){
+  const m=memories[i];
+
+  transitionQuote.textContent=`“${m.quote}”`;
+  detailTransition.classList.add("show");
+
+  setTimeout(()=>{
+    // Keep the enlarged whisper on screen for 2 seconds.
+    setTimeout(()=>{
+    detailId.textContent=`ARCHIVE•${m.code}`;
+    detailTitle.textContent=m.title.toUpperCase();
+    detailQuote.textContent=`“${m.quote}”`;
+    const hasSignature = m.signature && m.signature.trim() !== "" && m.signature !== "No name left.";
+
+    if(!hasSignature){
+      detailBy.textContent="Unknown";
+      detailAddress.textContent="";
+      detailSignature.textContent="No signature left.";
+    }else{
+      detailBy.textContent=m.by;
+      detailAddress.textContent=m.address;
+      detailSignature.textContent=`“${m.signature}”`;
+    }
+    detailSignature.textContent=`“${m.signature}”`;
+    detailDate.textContent=m.date;
+    detailAge.textContent=m.age;
+    detailType.textContent=m.type;
+    renderVisitorNotes();
+
+    showView("detail");
+    document.querySelector(".artifact").classList.remove("revealed");
+
+    setTimeout(()=>{
+      detailTransition.classList.remove("show");
+      setTimeout(()=>document.querySelector(".artifact").classList.add("revealed"),500);
+    },180);
+    },2000);
+  },350);
+}
+function createWhisperNode(){
+  const el=document.createElement("button");
+  el.className="whisper";
+  return el;
+}
+function row(m,i){
+  return `<button class="archive-row" onclick="openDetail(${i})">
+    <span class="archive-id">ARCHIVE•${m.code}</span>
+    <span class="archive-title">${m.title}</span>
+    <span class="muted hide-mobile">“${m.quote}”</span>
+    <span class="muted hide-mobile">${m.relative}</span>
+  </button>`;
+}
+const whisperPoolState={
+  active:[],
+  hotZones:[],
+  targetDensity:.80,
+  minDensity:.68,
+  maxDensity:.90,
+  lastPlacementCenter:null,
+  spawnTimer:null
+};
+
+function randomBetween(min,max){return Math.random()*(max-min)+min}
+
+function boxesOverlap(a,b,padX=0,padY=0){
+  return !(
+    a.right + padX < b.left ||
+    a.left > b.right + padX ||
+    a.bottom + padY < b.top ||
+    a.top > b.bottom + padY
+  );
+}
+
+function getStageRect(){
+  return whisperStage.getBoundingClientRect();
+}
+
+function getActiveBoxes(){
+  const stageRect=getStageRect();
+  return whisperPoolState.active
+    .filter(x=>x.phase!=="leaving")
+    .map(({el})=>{
+      const r=el.getBoundingClientRect();
+      return {
+        left:r.left-stageRect.left,
+        right:r.right-stageRect.left,
+        top:r.top-stageRect.top,
+        bottom:r.bottom-stageRect.top
+      };
+    });
+}
+
+function cleanupHotZones(){
+  const now=Date.now();
+  whisperPoolState.hotZones=whisperPoolState.hotZones.filter(z=>z.expiresAt>now);
+}
+
+function currentDensity(){
+  const stage=getStageRect();
+  if(stage.width<=0 || stage.height<=0)return 0;
+
+  const occupied=getActiveBoxes().reduce((sum,b)=>{
+    return sum + Math.max(0,b.right-b.left)*Math.max(0,b.bottom-b.top);
+  },0);
+
+  return Math.min(1,occupied/(stage.width*stage.height));
+}
+
+function createWhisperNode(){
+  const el=document.createElement("button");
+  el.className="whisper";
+  return el;
+}
+
+function measureWhisper(el){
+  const stageRect=getStageRect();
+
+  el.style.visibility="hidden";
+  el.style.opacity="0";
+  el.style.left="0px";
+  el.style.top="0px";
+  el.style.width=window.innerWidth<=900
+    ? Math.min(stageRect.width*.72, 460)+"px"
+    : Math.min(stageRect.width*randomBetween(.22,.32), 500)+"px";
+
+  whisperStage.appendChild(el);
+
+  const rect=el.getBoundingClientRect();
+  const fontSize=parseFloat(getComputedStyle(el.querySelector("q")).fontSize)||16;
+
+  return {
+    width:rect.width,
+    height:rect.height,
+    fontSize,
+    stageWidth:stageRect.width,
+    stageHeight:stageRect.height
+  };
+}
+
+function findFreePosition(metrics){
+  cleanupHotZones();
+
+  const active=getActiveBoxes();
+  const marginX=metrics.fontSize*2;
+  const marginY=metrics.fontSize*2;
+  const ownSize=Math.max(metrics.width,metrics.height);
+
+  const minLeft=marginX;
+  const maxLeft=Math.max(minLeft,metrics.stageWidth-metrics.width-marginX);
+  const minTop=marginY;
+  const maxTop=Math.max(minTop,metrics.stageHeight-metrics.height-marginY);
+
+  const levels=[2,1.6,1.25,0];
+
+  for(const separationMultiplier of levels){
+    const candidates=[];
+
+    for(let i=0;i<160;i++){
+      const left=randomBetween(minLeft,maxLeft);
+      const top=randomBetween(minTop,maxTop);
+      const box={
+        left,
+        right:left+metrics.width,
+        top,
+        bottom:top+metrics.height
+      };
+
+      if(active.some(a=>boxesOverlap(box,a,marginX,marginY)))continue;
+      if(whisperPoolState.hotZones.some(z=>boxesOverlap(box,z,marginX*.5,marginY*.5)))continue;
+
+      const center={
+        x:left+metrics.width/2,
+        y:top+metrics.height/2
+      };
+
+      if(separationMultiplier>0 && whisperPoolState.lastPlacementCenter){
+        const d=Math.hypot(
+          center.x-whisperPoolState.lastPlacementCenter.x,
+          center.y-whisperPoolState.lastPlacementCenter.y
+        );
+        if(d<ownSize*separationMultiplier)continue;
+      }
+
+      candidates.push({left,top,center,box});
+    }
+
+    if(candidates.length){
+      return candidates[Math.floor(Math.random()*candidates.length)];
+    }
+  }
+
+  return null;
+}
+
+function maskQuote(text){
+  const words=text.split(" ");
+  return words.map((word,index)=>{
+    const hide=index>0 && index%4===0;
+    return hide?`<span class="hidden-word">${word}</span>`:word;
+  }).join(" ");
+}
+
+function pickMemoryIndex(){
+  const used=new Set(
+    whisperPoolState.active
+      .filter(x=>x.phase!=="leaving")
+      .map(x=>x.memoryIndex)
+  );
+  let candidates=memories.map((_,i)=>i).filter(i=>!used.has(i));
+  if(!candidates.length)candidates=memories.map((_,i)=>i);
+  return candidates[Math.floor(Math.random()*candidates.length)];
+}
+
+function scheduleChild(entry){
+  const delay=randomBetween(1600,3000);
+
+  entry.childTimer=setTimeout(()=>{
+    if(entry.phase!=="visible")return;
+
+    const density=currentDensity();
+
+    if(density<whisperPoolState.targetDensity){
+      const success=mountWhisper(pickMemoryIndex());
+      if(!success && density<whisperPoolState.minDensity){
+        setTimeout(()=>mountWhisper(pickMemoryIndex()),700);
+      }
+    }
+  },delay);
+}
+
+function mountWhisper(memoryIndex){
+  if(currentDensity()>=whisperPoolState.maxDensity)return false;
+
+  const m=memories[memoryIndex];
+  const el=createWhisperNode();
+  el.classList.add(`kind-${m.kind}`);
+  const whisperAuthor = (m.signature && m.signature.trim() !== "" && m.signature !== "No name left.")
+    ? m.by
+    : "Unknown";
+  el.innerHTML=`<q class="memory-mask">${maskQuote(m.quote)}</q><div class="whisper-meta">BY ${whisperAuthor} · ${m.relative}</div>`;
+  el.onclick=()=>openDetail(memoryIndex);
+
+  const metrics=measureWhisper(el);
+  const pos=findFreePosition(metrics);
+
+  if(!pos){
+    el.remove();
+    whisperPoolState.lastPlacementCenter=null;
+    return false;
+  }
+
+  el.style.left=pos.left+"px";
+  el.style.top=pos.top+"px";
+  el.style.visibility="visible";
+  el.style.opacity="";
+
+  whisperPoolState.lastPlacementCenter=pos.center;
+
+  const now=Date.now();
+  const entry={
+    el,
+    memoryIndex,
+    phase:"entering",
+    createdAt:now,
+    visibleAt:now+900,
+    minRemoveAt:now+900+2000,
+    preferredRemoveAt:now+randomBetween(6500,11000),
+    childTimer:null
+  };
+  whisperPoolState.active.push(entry);
+
+  requestAnimationFrame(()=>{
+    void el.offsetWidth;
+    requestAnimationFrame(()=>{
+      el.classList.add("visible");
+      entry.phase="visible";
+      scheduleChild(entry);
+      scheduleRemoval(entry);
+    });
+  });
+
+  return true;
+}
+
+function scheduleRemoval(entry){
+  const wait=Math.max(0,entry.preferredRemoveAt-Date.now());
+
+  setTimeout(()=>{
+    if(entry.phase!=="visible")return;
+
+    const density=currentDensity();
+    if(Date.now()<entry.minRemoveAt){
+      scheduleRemoval(entry);
+      return;
+    }
+
+    // If density is already low, extend the life a little.
+    if(density<whisperPoolState.minDensity && Math.random()<.7){
+      entry.preferredRemoveAt=Date.now()+randomBetween(1200,2400);
+      scheduleRemoval(entry);
+      return;
+    }
+
+    removeWhisper(entry);
+  },wait);
+}
+
+function removeWhisper(entry){
+  if(!entry || entry.phase==="leaving")return false;
+  if(Date.now()<entry.minRemoveAt)return false;
+
+  entry.phase="leaving";
+  clearTimeout(entry.childTimer);
+
+  const r=entry.el.getBoundingClientRect();
+  const stage=getStageRect();
+
+  whisperPoolState.hotZones.push({
+    left:r.left-stage.left,
+    right:r.right-stage.left,
+    top:r.top-stage.top,
+    bottom:r.bottom-stage.top,
+    expiresAt:Date.now()+randomBetween(3500,6500)
+  });
+
+  entry.el.classList.remove("visible");
+  entry.el.classList.add("leaving");
+
+  setTimeout(()=>{
+    entry.el.remove();
+    whisperPoolState.active=whisperPoolState.active.filter(x=>x!==entry);
+
+    // Keep the engine alive without forcing a fixed count.
+    if(currentDensity()<whisperPoolState.minDensity){
+      const silence=Math.random()<.18;
+      if(silence){
+        silenceNote.classList.add("show");
+        setTimeout(()=>{
+          silenceNote.classList.remove("show");
+          mountWhisper(pickMemoryIndex());
+        },randomBetween(2800,4800));
+      }else{
+        setTimeout(()=>mountWhisper(pickMemoryIndex()),randomBetween(500,1100));
+      }
+    }
+  },950);
+
+  return true;
+}
+
+function seedWhispers(){
+  const initial=window.innerWidth<=900?1:2;
+
+  for(let i=0;i<initial;i++){
+    setTimeout(()=>mountWhisper(pickMemoryIndex()),i*700);
+  }
+}
+
+function initWhisperPool(){
+  clearTimeout(whisperPoolState.spawnTimer);
+  whisperStage.innerHTML="";
+  whisperPoolState.active=[];
+  whisperPoolState.hotZones=[];
+  whisperPoolState.lastPlacementCenter=null;
+
+  seedWhispers();
+}
+
+let whisperResizeTimer;
+let lastWhisperViewportWidth=window.innerWidth;
+window.addEventListener("resize",()=>{
+  const widthDelta=Math.abs(window.innerWidth-lastWhisperViewportWidth);
+  if(widthDelta<80)return;
+
+  lastWhisperViewportWidth=window.innerWidth;
+  clearTimeout(whisperResizeTimer);
+  whisperResizeTimer=setTimeout(initWhisperPool,300);
+});
+
+initWhisperPool();
+recentList.innerHTML=memories.slice(0,3).map(row).join("");
+archiveList.innerHTML=memories.map(row).join("");
+
+let connected=false,currentStep=1;
+function toggleWallet(){
+  connected=!connected;
+  walletBtn.textContent=connected?"0x9ab4...c12d":"Connect Wallet";
+  showToast(connected?"Wallet connected":"Wallet disconnected");
+}
+function startWizard(){currentStep=1;showView("wizard");renderStep()}
+function connectWalletAndNext(){connected=true;walletBtn.textContent="0x9ab4...c12d";nextStep()}
+function renderStep(){
+  document.querySelectorAll(".step").forEach(s=>s.classList.toggle("active",+s.dataset.step===currentStep));
+  progress.innerHTML="";
+  for(let i=1;i<=6;i++){const x=document.createElement("i");if(i<=Math.min(currentStep,6))x.className="on";progress.appendChild(x)}
+}
+function nextStep(){currentStep++;renderStep()}
+function prevStep(){currentStep=Math.max(1,currentStep-1);renderStep()}
+function selectObject(el){
+  document.querySelectorAll('[data-step="2"] .option').forEach(x=>x.classList.remove("selected"));
+  el.classList.add("selected");objectNext.disabled=false;
+}
+function selectOption(el,step){
+  document.querySelectorAll(`[data-step="${step}"] .option`).forEach(x=>x.classList.remove("selected"));
+  el.classList.add("selected");
+}
+function validateConfirm(){archiveBtn.disabled=confirmText.value.trim().toUpperCase()!=="ARCHIVE"}
+function completeArchive(){showToast("Simulating Sui transaction…");setTimeout(()=>{currentStep=7;renderStep()},700)}
+function showToast(t){toast.textContent=t;toast.style.display="block";clearTimeout(window.tt);window.tt=setTimeout(()=>toast.style.display="none",2000)}
+renderStep();
+</script>
+</body>
+</html>
