@@ -104,7 +104,7 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
   min-height:calc(100vh - 68px);display:grid;grid-template-columns:1.1fr .9fr
 }
 .artifact{
-  min-height:760px;padding:40px;display:flex;align-items:flex-end;
+  min-height:760px;padding:40px;display:flex;align-items:flex-start;
   background:
     linear-gradient(rgba(0,0,0,.1),rgba(0,0,0,.62)),
     radial-gradient(circle at 55% 35%,rgba(154,128,96,.18),transparent 28%),
@@ -141,6 +141,37 @@ textarea{min-height:140px}
 .success{text-align:center;padding:70px 20px}
 .seal{width:88px;height:88px;border:1px solid var(--paper);border-radius:50%;display:grid;place-items:center;margin:0 auto 24px;font-family:Georgia,serif;font-size:34px}
 .toast{position:fixed;right:24px;bottom:24px;border:1px solid var(--line);background:#151510;padding:13px 16px;display:none;z-index:40}
+
+.wallet-dialog[hidden]{display:none}
+.wallet-dialog{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px}
+.wallet-backdrop{position:absolute;inset:0;background:rgba(4,4,3,.82);backdrop-filter:blur(12px)}
+.wallet-panel{
+  position:relative;width:min(480px,100%);max-height:calc(100vh - 40px);overflow:auto;
+  border:1px solid var(--line);background:#11110e;padding:26px;box-shadow:0 30px 100px rgba(0,0,0,.55)
+}
+.wallet-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.wallet-panel h2{font-size:32px;margin:8px 0 5px}
+.wallet-close{border:0;background:none;color:var(--dim);font-size:24px;line-height:1;padding:4px}
+.wallet-status{min-height:22px;color:var(--dim);line-height:1.5;margin:14px 0 18px}
+.wallet-options{display:grid;gap:10px}
+.wallet-option{
+  display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:13px;width:100%;
+  border:1px solid var(--line);background:#151510;color:var(--paper);padding:12px;text-align:left
+}
+.wallet-option:hover,.wallet-option:focus-visible{border-color:rgba(231,225,210,.42);outline:none}
+.wallet-option.detected{border-color:rgba(154,128,96,.58)}
+.wallet-mark{
+  width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);
+  background:#1d1c18;color:var(--accent);font:13px "Courier New",monospace;overflow:hidden
+}
+.wallet-mark img{width:100%;height:100%;object-fit:cover}
+.wallet-option strong{display:block;font-weight:500}
+.wallet-option small{display:block;color:var(--dim);margin-top:4px}
+.wallet-option-state{color:var(--accent);font:10px "Courier New",monospace;letter-spacing:.1em}
+.wallet-disconnect{width:100%;margin-top:16px}
+.wallet-network{display:inline-flex;align-items:center;gap:7px;color:var(--dim);font:10px "Courier New",monospace;letter-spacing:.12em}
+.wallet-network:before{content:"";width:6px;height:6px;border-radius:50%;background:#79a786;box-shadow:0 0 10px rgba(121,167,134,.5)}
+body.wallet-open{overflow:hidden}
 
 
 /* v7 experiential details */
@@ -244,7 +275,7 @@ textarea{min-height:140px}
   <nav>
     <button onclick="showView('archive')">Archive</button>
     <button onclick="showView('home');document.getElementById('whispers').scrollIntoView()">Whispers</button>
-    <button class="wallet" id="walletBtn" onclick="toggleWallet()">Connect Wallet</button>
+    <button class="wallet" id="walletBtn" type="button" aria-haspopup="dialog" aria-controls="walletDialog">Connect Wallet</button>
   </nav>
 </header>
 
@@ -346,7 +377,7 @@ textarea{min-height:140px}
       <h2>Connect your wallet</h2>
       <p>The object must be directly owned by this wallet.</p>
       <div class="warning">Prototype only. No real Sui transaction will occur.</div>
-      <div class="actions" style="justify-content:flex-start"><button class="btn primary" onclick="connectWalletAndNext()">Connect Wallet</button></div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn primary" id="wizardWalletBtn" type="button">Connect Wallet</button></div>
     </div>
 
     <div class="step" data-step="2">
@@ -415,7 +446,36 @@ textarea{min-height:140px}
 </section>
 </main>
 
-<div class="detail-transition" id="detailTransition"><q id="transitionQuote"></q></div><div class="toast" id="toast"></div>
+<div class="detail-transition" id="detailTransition"><q id="transitionQuote"></q></div><div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="wallet-dialog" id="walletDialog" role="dialog" aria-modal="true" aria-labelledby="walletDialogTitle" hidden>
+  <div class="wallet-backdrop" data-wallet-close></div>
+  <section class="wallet-panel">
+    <div class="wallet-panel-head">
+      <div>
+        <div class="wallet-network">SUI MAINNET</div>
+        <h2 id="walletDialogTitle">Choose a wallet</h2>
+      </div>
+      <button class="wallet-close" id="walletCloseBtn" type="button" aria-label="Close wallet selector">×</button>
+    </div>
+    <p class="wallet-status" id="walletStatus">Detecting compatible wallets…</p>
+    <div class="wallet-options">
+      <button class="wallet-option" type="button" data-wallet-key="slush">
+        <span class="wallet-mark" data-wallet-mark>SL</span><span><strong>Slush</strong><small>Sui native wallet</small></span><span class="wallet-option-state">CHECKING</span>
+      </button>
+      <button class="wallet-option" type="button" data-wallet-key="phantom">
+        <span class="wallet-mark" data-wallet-mark>PH</span><span><strong>Phantom</strong><small>Multichain wallet with Sui</small></span><span class="wallet-option-state">CHECKING</span>
+      </button>
+      <button class="wallet-option" type="button" data-wallet-key="binance">
+        <span class="wallet-mark" data-wallet-mark>BN</span><span><strong>Binance Wallet</strong><small>Browser wallet with Sui</small></span><span class="wallet-option-state">CHECKING</span>
+      </button>
+      <button class="wallet-option" type="button" data-wallet-key="okx">
+        <span class="wallet-mark" data-wallet-mark>OK</span><span><strong>OKX Wallet</strong><small>Multichain Wallet Standard</small></span><span class="wallet-option-state">CHECKING</span>
+      </button>
+    </div>
+    <button class="btn wallet-disconnect" id="walletDisconnectBtn" type="button" hidden>Disconnect current wallet</button>
+  </section>
+</div>
 
 <script>
 const memories=[
@@ -845,14 +905,8 @@ initWhisperPool();
 recentList.innerHTML=memories.slice(0,3).map(row).join("");
 archiveList.innerHTML=memories.map(row).join("");
 
-let connected=false,currentStep=1;
-function toggleWallet(){
-  connected=!connected;
-  walletBtn.textContent=connected?"0x9ab4...c12d":"Connect Wallet";
-  showToast(connected?"Wallet connected":"Wallet disconnected");
-}
+let currentStep=1;
 function startWizard(){currentStep=1;showView("wizard");renderStep()}
-function connectWalletAndNext(){connected=true;walletBtn.textContent="0x9ab4...c12d";nextStep()}
 function renderStep(){
   document.querySelectorAll(".step").forEach(s=>s.classList.toggle("active",+s.dataset.step===currentStep));
   progress.innerHTML="";
@@ -873,5 +927,6 @@ function completeArchive(){showToast("Simulating Sui transaction…");setTimeout
 function showToast(t){toast.textContent=t;toast.style.display="block";clearTimeout(window.tt);window.tt=setTimeout(()=>toast.style.display="none",2000)}
 renderStep();
 </script>
+<script type="module" src="/src/wallet.js"></script>
 </body>
 </html>
