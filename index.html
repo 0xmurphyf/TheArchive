@@ -788,6 +788,14 @@ function archiveMessage(archive){
   if(msg && msg.trim()!=="") return capFirst(msg);
   return sealedLabel(archive.content?.artifact?.balance, archive.content?.artifact?.name, archive.content?.artifact_type);
 }
+// Detail-page MEMORY text: when an artifact was sealed with no message, show a
+// neutral placeholder instead of the frozen amount / "SEALED FOREVER" label
+// (which is still used in lists and cards via archiveMessage()).
+function detailMemoryText(archive){
+  const msg=archive.content?.message;
+  if(msg && msg.trim()!=="") return capFirst(msg);
+  return "Sealed forever, with no message.";
+}
 function archiveDisplayTitle(archive){
   const artifact=archive.content?.artifact;
   if(artifact?.name)return artifact.name;
@@ -916,7 +924,7 @@ function openChainArchive(archiveId){
   const content=archive.content||{};
   detailId.innerHTML=suiscanLink(archive.archiveId, `ARCHIVE·${shortHash(archive.archiveId,10)}`);
   detailTitle.textContent=archiveDisplayTitle(archive).toUpperCase();
-  detailQuote.textContent=`“${archiveMessage(archive)}”`;
+  detailQuote.textContent=`“${detailMemoryText(archive)}”`;
   const sigRaw=content.sealer_signature && content.sealer_signature.trim()!=="" ? content.sealer_signature.trim() : "anonymous";
   const sig=capFirst(sigRaw);
   detailSignature.textContent=`“${sig}”`;
