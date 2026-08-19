@@ -18,13 +18,14 @@ On Railway, persist `server/data` with a volume and use
 `pnpm --dir server start` as the start command. Build the frontend before the
 service starts so that `dist/index.html` exists.
 
-**Railway volume (required for durability):** Railway does NOT honor the
-`VOLUME` directive in the Dockerfile. You must create a Railway Volume in the
-project dashboard and mount it at `/app/server/data`. If you skip this, the
-SQLite archive cache (`archive.sqlite`), uploaded Original Images (`uploads/`),
-and visitor comments are stored on the container's ephemeral filesystem and are
-**lost on every rebuild / deploy**. The Dockerfile only declares the volume so
-the mount point exists; the actual persistence comes from the Railway Volume.
+**Durability / volume (required):** the host platform must mount a volume at
+`/app/server/data` or all durable data is lost on every rebuild. Railway does
+NOT honor the `VOLUME` directive in the Dockerfile — you must create a volume and
+mount it at `/app/server/data` in the dashboard. On **Dokploy**, attach a volume
+with Container Path `/app/server/data` (see `DOKPLOY-SETUP.md`). If you skip
+this, the SQLite archive cache (`archive.sqlite`), uploaded Original Images
+(`uploads/`), and visitor comments are on the container's ephemeral filesystem
+and are **lost on every rebuild / deploy**.
 
 Configuration is documented in `.env.example`. The default network is Sui
 Testnet and the default reconciliation interval is one hour.
