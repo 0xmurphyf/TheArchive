@@ -279,7 +279,7 @@ async function mapWithConcurrency(items, limit, fn) {
 }
 
 const POLICY_OBJECT_ID =
-  '0xfd3a6fd05d9f30f0cac49f133445e13dea730206d5d87bcf4e5890c5b89f681f';
+  '0x2241f042fe1119352e02dbc4869229f30e51a3dc3f546e09084a47bb6736e04d';
 const CLOCK_OBJECT_ID = '0x6';
 const STORAGE_NONE = 0;
 const STORAGE_EXTERNAL = 1;
