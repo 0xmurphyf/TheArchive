@@ -174,6 +174,7 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
 .filter-tabs{display:flex;gap:8px}
 .filter-tab{background:transparent;border:1px solid var(--line);color:var(--dim);padding:8px 14px;font:11px "Courier New",monospace;letter-spacing:.08em;cursor:pointer}
 .filter-tab.selected{border-color:var(--paper);color:var(--paper)}
+.toggle-btn.off{border-color:var(--line);color:var(--dim);opacity:.7}
 .coin-amount{margin-top:12px;text-align:left;font:11px "Courier New",monospace;color:var(--dim);display:flex;flex-direction:column;gap:4px}
 .coin-amount input{margin-top:2px;background:#0f0f0d;border:1px solid var(--line);color:var(--paper);padding:7px 9px;font-family:inherit}
 .storage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:16px}
@@ -515,7 +516,7 @@ body.wallet-open{overflow:hidden}
     <div class="step active" data-step="1">
       <h2>Choose an object</h2>
       <p>Select an object currently under your full control to permanently freeze.<br><strong>Once frozen, it will be removed from your ownership and can never be recovered.</strong></p>
-      <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" onclick="refreshWizardObjects()">Scan and Refresh</button></div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" onclick="refreshWizardObjects()">Scan and Refresh</button><button class="btn toggle-btn" type="button" id="hideUnarchivableBtn" aria-pressed="true" onclick="toggleHideUnarchivable(this)">Hide unarchivable: ON</button></div>
       <div class="object-controls">
         <input type="text" id="objectSearch" placeholder="Search by name or object ID…" oninput="renderFilteredObjects()">
         <div class="filter-tabs" id="objectFilter">
@@ -1414,6 +1415,7 @@ const coinAmountValues=new Map();
 let wizardObjects=[];
 let wizardScanIncomplete=false;
 let wizardFilter='all';
+let wizardHideUnarchivable=true; // when true, hide objects that cannot be archived (NO STORE / SUI / Kiosk / special ownership)
 let wizardCollection=null;
 let wizardFocusedObjectId=null;
 let lastWizardWalletAddress=null;
@@ -1475,6 +1477,33 @@ function setObjectFilter(kind,el){
   wizardCollection=null;
   document.querySelectorAll('#objectFilter .filter-tab').forEach(x=>x.classList.remove('selected'));
   el.classList.add('selected');
+  renderFilteredObjects();
+}
+// Mirror of the Continue (nextStep) gates: returns true when an object cannot
+// proceed to the archive flow. Used by the "hide unarchivable" toggle.
+function objectCannotContinue(o){
+  if(!o || !o.objectId)return false;
+  if(Boolean(o.noStore))return true;
+  if(isSuiCoin(o))return true;
+  const inKiosk=Boolean(
+    o.kioskId||o.kioskOwnerCapId||o.kiosk||o.ownerObjectId||o.inKiosk||
+    o.ownershipStatus==='Locked in Kiosk'
+  );
+  if(inKiosk)return true;
+  const special=Boolean(
+    o.ownerObjectId||o.objectStatus==='ObjectOwned'||o.ownershipStatus==='ObjectOwned'||
+    o.ownershipStatus==='Special'||o.ownershipStatus==='Listed'||o.specialOwnership
+  );
+  if(special)return true;
+  return false;
+}
+function toggleHideUnarchivable(btn){
+  wizardHideUnarchivable=!wizardHideUnarchivable;
+  if(btn){
+    btn.classList.toggle('off',!wizardHideUnarchivable);
+    btn.textContent=wizardHideUnarchivable?'Hide unarchivable: ON':'Hide unarchivable: OFF';
+    btn.setAttribute('aria-pressed',String(wizardHideUnarchivable));
+  }
   renderFilteredObjects();
 }
 function isSuiCoin(o){return /::coin::Coin<[^>]*::sui::SUI\s*>/i.test(String(o?.type||''))}
@@ -1559,6 +1588,7 @@ function renderFilteredObjects(){
   }
   const q=(document.getElementById('objectSearch')?.value||'').trim().toLowerCase();
   const list=wizardObjects.filter(o=>o.objectId).filter(o=>{
+    if(wizardHideUnarchivable && objectCannotContinue(o))return false;
     const kind=objectKind(o);
     if(wizardFilter!=='all' && kind!==wizardFilter)return false;
     const collection=kind==='nft'?objectCollection(o):null;
