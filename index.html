@@ -466,7 +466,6 @@ body.wallet-open{overflow:hidden}
       <img id="detailImage" class="artifact-image" alt="Archived artifact image" hidden>
       <div>
         <div class="eyebrow">ARCHIVED ARTIFACT</div>
-        <h2 id="detailTitle">VOXX FILE #0042</h2>
       </div>
     </div>
     <div class="detail-panel message-first">
@@ -699,7 +698,6 @@ function openDetail(i){
     // Keep the enlarged whisper on screen for 2 seconds.
     setTimeout(()=>{
     detailId.innerHTML=suiscanLink(m.address, `ARCHIVE•${m.code}`);
-    detailTitle.textContent=m.title.toUpperCase();
     detailQuote.textContent=`“${capFirst(m.quote)}”`;
     const sigRaw = m.signature && m.signature.trim() !== "" && m.signature !== "No name left." ? m.signature.trim() : "anonymous";
     const sig = capFirst(sigRaw);
@@ -915,7 +913,6 @@ function openChainArchive(archiveId){
   renderMostCheckedArtifact(chainArchives);
   const content=archive.content||{};
   detailId.innerHTML=suiscanLink(archive.archiveId, `ARCHIVE·${shortHash(archive.archiveId,10)}`);
-  detailTitle.textContent=archiveDisplayTitle(archive).toUpperCase();
   detailQuote.textContent=`“${archiveMessage(archive)}”`;
   const sigRaw=content.sealer_signature && content.sealer_signature.trim()!=="" ? content.sealer_signature.trim() : "anonymous";
   const sig=capFirst(sigRaw);
