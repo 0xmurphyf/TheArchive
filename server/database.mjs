@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
 function stringify(value) {
@@ -29,6 +30,14 @@ export class ArchiveStore {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       ) STRICT;
+      CREATE TABLE IF NOT EXISTS comments (
+        id TEXT PRIMARY KEY,
+        archive_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS comments_by_archive
+        ON comments (archive_id, created_at DESC, id DESC);
     `);
 
     this.selectArchive = this.db.prepare(
@@ -54,6 +63,17 @@ export class ArchiveStore {
     `);
     this.deleteMeta = this.db.prepare('DELETE FROM metadata WHERE key = ?');
     this.selectCount = this.db.prepare('SELECT COUNT(*) AS count FROM archives');
+    this.insertCommentStmt = this.db.prepare(`
+      INSERT INTO comments (id, archive_id, text, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    this.selectCommentsStmt = this.db.prepare(`
+      SELECT id, archive_id, text, created_at
+      FROM comments
+      WHERE archive_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `);
   }
 
   upsertArchive(archive, now = new Date().toISOString()) {
@@ -106,6 +126,28 @@ export class ArchiveStore {
       return;
     }
     this.upsertMeta.run(key, String(value));
+  }
+
+  insertComment({ archiveId, text, id, createdAt = new Date().toISOString() }) {
+    const archive = String(archiveId || '');
+    const body = String(text || '').trim();
+    if (!archive) throw new TypeError('comment.archiveId is required');
+    if (!body) throw new TypeError('comment.text is required');
+    const commentId = String(id || randomUUID());
+    this.insertCommentStmt.run(commentId, archive, body, createdAt);
+    return { id: commentId, archiveId: archive, text: body, createdAt };
+  }
+
+  listComments(archiveId, limit = 50) {
+    const archive = String(archiveId || '');
+    if (!archive) return [];
+    const rows = this.selectCommentsStmt.all(archive, Number.isFinite(limit) ? limit : 50);
+    return rows.map((row) => ({
+      id: row.id,
+      archiveId: row.archive_id,
+      text: row.text,
+      createdAt: row.created_at,
+    }));
   }
 
   close() {

@@ -652,33 +652,72 @@ const memories=[
 ];
 
 
+function visitorArchiveId(){
+  return (detailId?.textContent||'').trim();
+}
+
 function visitorStorageKey(){
-  return `archive-visitors-${detailId.textContent}`;
+  return `archive-visitors-${visitorArchiveId()}`;
 }
 
-function renderVisitorNotes(){
-  const notes=JSON.parse(localStorage.getItem(visitorStorageKey())||"[]");
-  visitorList.innerHTML=notes.map(n=>`
-    <div class="visitor-entry">“${n.text}”
-      <small>${n.time}</small>
+function formatVisitorTime(iso){
+  if(!iso)return '';
+  const d=String(iso).replace('T',' ').replace(/\.\d+Z$/,'');
+  return /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(d)?`${d} UTC`:iso;
+}
+
+function renderVisitorNotes(notes){
+  const list=notes||[];
+  if(!list.length){
+    visitorList.innerHTML='<div class="visitor-entry" style="opacity:.6">No notes yet. Be the first to remember.</div>';
+    return;
+  }
+  visitorList.innerHTML=list.map(n=>`
+    <div class="visitor-entry">“${escapeHtml(n.text)}”
+      <small>${formatVisitorTime(n.createdAt||n.time)}</small>
     </div>
-  `).join("");
+  `).join('');
 }
 
-function addVisitorNote(){
+async function loadVisitorNotes(){
+  const archiveId=visitorArchiveId();
+  if(!archiveId)return;
+  try{
+    const response=await fetch(`/api/comments?archiveId=${encodeURIComponent(archiveId)}`,{headers:{'accept':'application/json'}});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    renderVisitorNotes(data.comments||[]);
+  }catch(error){
+    console.warn('[visitor-book] API unavailable, using local cache',error);
+    const cached=JSON.parse(localStorage.getItem(visitorStorageKey())||'[]');
+    renderVisitorNotes(cached);
+  }
+}
+
+async function addVisitorNote(){
   const text=visitorInput.value.trim();
   if(!text)return;
-
-  const notes=JSON.parse(localStorage.getItem(visitorStorageKey())||"[]");
-  notes.unshift({
-    text,
-    time:new Date().toISOString().replace("T"," ").replace(/\.\d+Z$/," UTC")
-  });
-
-  localStorage.setItem(visitorStorageKey(),JSON.stringify(notes.slice(0,20)));
-  visitorInput.value="";
-  renderVisitorNotes();
-  showToast("Visitor note added");
+  const archiveId=visitorArchiveId();
+  if(!archiveId)return;
+  const optimistic={text,createdAt:new Date().toISOString()};
+  const cached=JSON.parse(localStorage.getItem(visitorStorageKey())||'[]');
+  cached.unshift(optimistic);
+  localStorage.setItem(visitorStorageKey(),JSON.stringify(cached.slice(0,20)));
+  visitorInput.value='';
+  renderVisitorNotes(cached);
+  try{
+    const response=await fetch(`/api/comments?archiveId=${encodeURIComponent(archiveId)}`,{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({text})
+    });
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    await loadVisitorNotes();
+    showToast('Visitor note added');
+  }catch(error){
+    console.warn('[visitor-book] could not save note to server; kept locally',error);
+    showToast('Saved on this device only (server unavailable)');
+  }
 }
 
 function showView(id){
@@ -704,7 +743,7 @@ function openDetail(i){
     detailSignature.textContent=`“${sig}”`;
     detailDate.textContent=m.date;
     detailAge.textContent=m.age;
-    renderVisitorNotes();
+    loadVisitorNotes();
 
     showView("detail");
     document.querySelector(".artifact").classList.remove("revealed");
@@ -926,7 +965,7 @@ function openChainArchive(archiveId){
   detailImage.onerror=fallbackArchiveImage;
   if(imageUrl)detailImage.src=imageUrl;
   else detailImage.removeAttribute("src");
-  renderVisitorNotes();
+  loadVisitorNotes();
   showView("detail");
   document.querySelector(".artifact").classList.add("revealed");
 }

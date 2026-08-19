@@ -86,3 +86,50 @@ test('HTTP server accepts an image upload and serves it back', async (t) => {
   assert.equal(served.status, 200);
   assert.equal(await served.text(), payload.toString());
 });
+
+test('HTTP server stores and returns visitor comments', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'archive-comments-'));
+  await writeFile(join(directory, 'index.html'), '<h1>The Archive</h1>');
+  const store = new ArchiveStore(':memory:');
+  const server = createArchiveHttpServer({
+    store,
+    events: new ArchiveEvents(),
+    packageId: '0xpkg',
+    eventType: '0xpkg::memory_archive::MemoryArchived',
+    staticDir: directory,
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const { port } = server.address();
+  const archiveId = '0xabc';
+
+  const missing = await fetch(`http://127.0.0.1:${port}/api/comments`);
+  assert.equal(missing.status, 400);
+
+  const post = await fetch(`http://127.0.0.1:${port}/api/comments?archiveId=${archiveId}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'I remember this.' }),
+  });
+  assert.equal(post.status, 201);
+  const saved = await post.json();
+  assert.equal(saved.archiveId, archiveId);
+  assert.equal(saved.text, 'I remember this.');
+
+  const get = await fetch(`http://127.0.0.1:${port}/api/comments?archiveId=${archiveId}`);
+  assert.equal(get.status, 200);
+  const data = await get.json();
+  assert.equal(data.comments.length, 1);
+  assert.equal(data.comments[0].text, 'I remember this.');
+
+  const long = await fetch(`http://127.0.0.1:${port}/api/comments?archiveId=${archiveId}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'x'.repeat(121) }),
+  });
+  assert.equal(long.status, 400);
+});

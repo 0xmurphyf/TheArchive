@@ -18,6 +18,14 @@ On Railway, persist `server/data` with a volume and use
 `pnpm --dir server start` as the start command. Build the frontend before the
 service starts so that `dist/index.html` exists.
 
+**Railway volume (required for durability):** Railway does NOT honor the
+`VOLUME` directive in the Dockerfile. You must create a Railway Volume in the
+project dashboard and mount it at `/app/server/data`. If you skip this, the
+SQLite archive cache (`archive.sqlite`), uploaded Original Images (`uploads/`),
+and visitor comments are stored on the container's ephemeral filesystem and are
+**lost on every rebuild / deploy**. The Dockerfile only declares the volume so
+the mount point exists; the actual persistence comes from the Railway Volume.
+
 Configuration is documented in `.env.example`. The default network is Sui
 Testnet and the default reconciliation interval is one hour.
 
@@ -27,6 +35,9 @@ Testnet and the default reconciliation interval is one hour.
 - `GET /api/health` — cache and listener health
 - `GET /api/archives/stream` — SSE; new records use event name `archive`
 - `GET /api/owned-objects?address=0x...` — merged NFT/Kiosk ownership from the configured indexer
+- `GET /api/comments?archiveId=0x...` — visitor notes for an archive (newest first, max 100)
+- `POST /api/comments?archiveId=0x...` — add a visitor note (`{ "text": "..." }`, max 120 chars)
+- `POST /api/uploads` — Original Image upload (image only), served from `/media/...`
 
 Owned-object indexer configuration:
 

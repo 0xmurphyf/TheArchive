@@ -200,6 +200,62 @@ export function createArchiveHttpServer({
       json(res, 201, { url: `${base}/media/${filename}`, bytes: size, contentType });
       return;
     }
+    if (url.pathname === '/api/comments' && store) {
+      const archiveId = (url.searchParams.get('archiveId') || '').trim();
+      if (!archiveId) {
+        json(res, 400, { error: 'archiveId is required' });
+        return;
+      }
+      if (req.method === 'GET') {
+        const limit = Math.min(Number(url.searchParams.get('limit') || 50) || 50, 100);
+        const comments = store.listComments(archiveId, limit);
+        json(res, 200, { archiveId, comments });
+        return;
+      }
+      if (req.method === 'POST') {
+        const chunks = [];
+        let size = 0;
+        const maxBytes = 16 * 1024; // generous for a 120-char note + metadata
+        try {
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > maxBytes) {
+              json(res, 413, { error: 'Comment too large' });
+              return;
+            }
+            chunks.push(chunk);
+          }
+        } catch {
+          json(res, 400, { error: 'Unable to read request body' });
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {
+          json(res, 400, { error: 'Invalid JSON body' });
+          return;
+        }
+        const text = String(payload?.text || '').trim();
+        if (!text) {
+          json(res, 400, { error: 'Comment text is required' });
+          return;
+        }
+        if (text.length > 120) {
+          json(res, 400, { error: 'Comment must be 120 characters or fewer' });
+          return;
+        }
+        try {
+          const saved = store.insertComment({ archiveId, text });
+          json(res, 201, saved);
+        } catch (error) {
+          json(res, 500, { error: String(error?.message || error) });
+        }
+        return;
+      }
+      json(res, 405, { error: 'Method not allowed' });
+      return;
+    }
     if (url.pathname.startsWith('/media/')) {
       const filename = url.pathname.slice('/media/'.length);
       if (!/^[0-9a-f-]+\.(jpg|png|webp|gif|avif|svg|bin)$/.test(filename) || !uploadsDir) {
