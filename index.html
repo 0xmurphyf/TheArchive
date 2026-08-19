@@ -1371,6 +1371,10 @@ let selectedObjectId=null;
 let selectedObjectType=null;
 let selectedGasPayment=null;
 let wizardObjectsLoaded=false;
+// Persist each coin's entered partial-archive amount across grid re-renders.
+// renderFilteredObjects() rebuilds every card (grid.innerHTML=''), which would
+// otherwise wipe the typed value and silently archive the whole coin.
+const coinAmountValues=new Map();
 let wizardObjects=[];
 let wizardScanIncomplete=false;
 let wizardFilter='all';
@@ -1491,11 +1495,20 @@ function appendObjectCard(grid,obj,focused=false){
   else if(specialOwnership)extra+=`<div class="object-state-kiosk"><a href="https://kiosk.voxxinc.xyz" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">◆ LISTED / OBJECT CONTROLLED</a></div>`;
   if(obj.isCoin){
     const fullSUI = obj.balance!==undefined ? Number(obj.balance)/1e9 : 0;
-    extra+=`<div class="coin-amount" onclick="event.stopPropagation()"><label>Amount</label><input type="number" min="0" max="${fullSUI}" step="0.000000001" placeholder="Default archive all" data-balance="${obj.balance!==undefined?obj.balance:''}" disabled><span class="muted">max ${fullSUI.toFixed(4)}</span></div>`;
+    const savedVal = coinAmountValues.get(obj.objectId) || '';
+    extra+=`<div class="coin-amount" onclick="event.stopPropagation()"><label>Amount</label><input type="number" min="0" max="${fullSUI}" step="0.000000001" placeholder="Default archive all" data-balance="${obj.balance!==undefined?obj.balance:''}" value="${savedVal}" disabled><span class="muted">max ${fullSUI.toFixed(4)}</span></div>`;
   }
   const alert=blocked?'⛔':locked?'🔒':'';
   const thumb=cardImageUrl?`<img src="${escapeHtml(cardImageUrl)}" alt="" onerror="${obj.isCoin?'fallbackCoinImage(event)':'fallbackObjectImage(event)'}">`:obj.isCoin?`<div class="coin-glyph">${escapeHtml(label.slice(0,6))}</div>`:kind.slice(0,4);
   card.innerHTML=`${alert?`<span class="object-alert" title="${blocked?'Blocked by Sui DenyList':'Locked by Kiosk TransferPolicy'}">${alert}</span>`:''}<div class="object-thumb">${thumb}</div><strong>${escapeHtml(label)}</strong><p>${suiscanLink(obj.objectId, obj.objectId.slice(0,10)+'…')}</p>${extra}`;
+  if(obj.isCoin){
+    const amtInput=card.querySelector('.coin-amount input');
+    if(amtInput)amtInput.addEventListener('input',()=>{
+      const v=amtInput.value.trim();
+      if(v==='')coinAmountValues.delete(obj.objectId);
+      else coinAmountValues.set(obj.objectId,v);
+    });
+  }
   grid.appendChild(card);
   return card;
 }
@@ -1568,6 +1581,13 @@ function renderFilteredObjects(){
   const otherObjects=(wizardCollection?list:list.filter(o=>objectKind(o)!=='nft')).filter(o=>o.objectId!==wizardFocusedObjectId);
   for(const obj of otherObjects)appendObjectCard(grid,obj);
   if(wizardCollection && !otherObjects.length && !focusedObject)grid.innerHTML+='<div class="chain-empty">No NFTs found in this collection.</div>';
+  // Re-apply the current selection + coin amount after rebuilding the grid,
+  // so a re-render (filter, search, or background STORE check) does not wipe
+  // the user's chosen object or typed partial-archive amount.
+  if(selectedObjectId){
+    const sel=grid.querySelector(`[data-object-id="${CSS.escape(selectedObjectId)}"]`);
+    if(sel){sel.classList.add('selected');const ai=sel.querySelector('.coin-amount input');if(ai)ai.disabled=false;}
+  }
 }
 
 async function startWizard(){
