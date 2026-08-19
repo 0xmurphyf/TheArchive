@@ -1884,22 +1884,30 @@ async function fetchArchivedArtifactIds(){
   try {
     const normalize=(value)=>{const raw=String(value||'').toLowerCase().replace(/^0x/,'').replace(/^0+/,'');return raw?`0x${raw}`:''};
     const archiveApi=window.theArchiveTx||{};
-    const eventPackage=archiveApi.EVENT_PACKAGE_ID||archiveApi.PACKAGE_ID||'0x438eab12b59b366c113c54e864c34232c4514002043081747aff7a0de6c293f0';
+    const currentPackage=archiveApi.EVENT_PACKAGE_ID||archiveApi.PACKAGE_ID||'0x438eab12b59b366c113c54e864c34232c4514002043081747aff7a0de6c293f0';
+    // Also include the legacy live package: objects archived under the old
+    // contract are still frozen and must not re-appear in Choose Object.
+    const legacyPackages=new Set([
+      '0x681b894c304cf148494cf2f1ab792e918cd83e510cb7fe2e912b5098d855851d',
+    ]);
+    const packagesToScan=new Set([currentPackage, ...legacyPackages].map(p=>String(p).toLowerCase()));
     const ids=new Set();
-    let cursor=null;
-    do{
-      const response=await fetch('https://graphql.mainnet.sui.io/graphql',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query,variables:{cursor,t:`${eventPackage}::memory_archive::MemoryArchived`}})});
-      if(!response.ok){console.warn('[archive-filter] GraphQL HTTP error',response.status);return ids;}
-      const body=await response.json();
-      if(body.errors?.length){console.warn('[archive-filter] GraphQL query failed',body.errors);return ids;}
-      const page=body.data?.events;
-      for(const node of page?.nodes||[]){
-        const raw=node.contents?.json;
-        const json=typeof raw==='string'?((()=>{try{return JSON.parse(raw)}catch(_){return {}}})()):raw||{};
-        for(const key of ['original_object_id','artifact_id']){const id=normalize(json[key]);if(id)ids.add(id);}
-      }
-      cursor=page?.pageInfo?.hasNextPage?page.pageInfo.endCursor:null;
-    }while(cursor);
+    for(const pkg of packagesToScan){
+      let cursor=null;
+      do{
+        const response=await fetch('https://graphql.mainnet.sui.io/graphql',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query,variables:{cursor,t:`${pkg}::memory_archive::MemoryArchived`}})});
+        if(!response.ok){console.warn('[archive-filter] GraphQL HTTP error',response.status);continue;}
+        const body=await response.json();
+        if(body.errors?.length){console.warn('[archive-filter] GraphQL query failed',body.errors);continue;}
+        const page=body.data?.events;
+        for(const node of page?.nodes||[]){
+          const raw=node.contents?.json;
+          const json=typeof raw==='string'?((()=>{try{return JSON.parse(raw)}catch(_){return {}}})()):raw||{};
+          for(const key of ['original_object_id','artifact_id']){const id=normalize(json?json[key]:undefined);if(id)ids.add(id);}
+        }
+        cursor=page?.pageInfo?.hasNextPage?page.pageInfo.endCursor:null;
+      }while(cursor);
+    }
     console.info('[archive-filter] loaded archived artifact ids',ids.size);
     return ids;
   } catch(error) {
