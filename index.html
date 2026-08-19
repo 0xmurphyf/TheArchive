@@ -1647,6 +1647,11 @@ async function nextStep(){
       window.alert('This object cannot be archived because its Move type does not have the store ability (NO STORE).');
       return;
     }
+    const scanIsSuiCoin=Boolean(selectedCard.dataset.isCoin==='1' && isSuiCoin(selectedModel||{}));
+    if(scanIsSuiCoin){
+      window.alert('SUI coin cannot be archived through The Archive. Only NFTs and other objects can be permanently sealed here.');
+      return;
+    }
     const scanInKiosk=Boolean(
       selectedCard.dataset.kioskId||
       selectedCard.dataset.kioskOwnerCapId||
