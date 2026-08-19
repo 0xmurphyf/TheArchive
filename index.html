@@ -1951,7 +1951,7 @@ async function loadWizardObjects(){
       .then(response=>response.ok?response.json():null)
       .catch(()=>null),
     fetchArchivedArtifactIds(),
-  ]).then(([rpcObjects,indexed,archivedIds])=>{
+  ]).then(async ([rpcObjects,indexed,archivedIds])=>{
     wizardScanIncomplete=Boolean(rpcObjects?.scanIncomplete);
     const byId=new Map((rpcObjects||[]).map(object=>[object.objectId,object]));
     for(const object of indexed?.objects||[]) {
@@ -1967,6 +1967,25 @@ async function loadWizardObjects(){
     }
     const manualObjects=wizardObjects.filter(object=>object.manual);
     const manualIds=new Set(manualObjects.map(object=>object.objectId));
+    // Manually added objects must still be valid: if the object was already
+    // archived (in archivedIds) or no longer resolves on-chain (object=null /
+    // consumed), it must not appear in Choose Object. We probe each manual id
+    // once; network errors are treated as "keep" (don't hide on transient
+    // failure), only a definitive not-found drops it.
+    const resolvableManualIds=new Set();
+    await Promise.all(manualObjects.map(async(object)=>{
+      const id=object.objectId;
+      if(archivedIds.has(String(id||'').toLowerCase()))return; // archived -> drop
+      try{
+        await window.theArchiveTx.fetchObjectById(client,id);
+        resolvableManualIds.add(id);
+      }catch(error){
+        const text=String(error?.message||error||'').toLowerCase();
+        const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
+        if(!gone)resolvableManualIds.add(id); // uncertain (network) -> keep
+        // gone -> omit from resolvableManualIds -> dropped below
+      }
+    }));
     const previousById=new Map((wizardScanIncomplete?wizardObjects:manualObjects).filter(object=>object?.objectId).map(object=>[String(object.objectId).toLowerCase(),object]));
     const mergedById=new Map(previousById);
     for(const [id,incoming] of byId){
@@ -1993,7 +2012,12 @@ async function loadWizardObjects(){
         ownershipStatus:incoming.ownershipStatus||previous.ownershipStatus,
       }:incoming);
     }
-    const objects=[...mergedById.values()].filter(object=>manualIds.has(object.objectId)||!archivedIds.has(String(object.objectId||'').toLowerCase()));
+    const objects=[...mergedById.values()].filter(object=>{
+      const id=String(object.objectId||'').toLowerCase();
+      if(archivedIds.has(id))return false; // archived -> hide
+      if(manualIds.has(object.objectId))return resolvableManualIds.has(object.objectId); // manual: only if still resolvable
+      return true;
+    });
     wizardObjects=objects;
     if(!objects.length){
       grid.innerHTML=`${wizardScanIncomplete?'<div class="chain-empty scan-incomplete-notice">Scan incomplete. Enter an Object ID above to add a missing object.</div>':''}<div class="chain-empty">No objects found in this wallet. Mint or receive a Mainnet object first.</div>`;
