@@ -1,4 +1,4 @@
-export const PACKAGE_ID = '0x681b894c304cf148494cf2f1ab792e918cd83e510cb7fe2e912b5098d855851d';
+export const PACKAGE_ID = '0x438eab12b59b366c113c54e864c34232c4514002043081747aff7a0de6c293f0';
 export const EVENT_TYPE = `${PACKAGE_ID}::memory_archive::MemoryArchived`;
 export const GRAPHQL_ENDPOINT = 'https://graphql.mainnet.sui.io/graphql';
 const configuredArchiveApiUrl = import.meta.env?.VITE_ARCHIVE_API_URL?.trim();

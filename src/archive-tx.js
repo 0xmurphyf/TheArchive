@@ -12,8 +12,8 @@ const GRAPHQL_ENDPOINT = 'https://graphql.mainnet.sui.io/graphql';
 // Mainnet v5 runtime package. Keep chain-archives.js on the canonical/original
 // package ID for event type queries; transaction targets must use the published
 // package that actually contains the v5 metadata validation.
-const RUNTIME_PACKAGE_ID = '0xc4a05bd6f1950e2db689599894bfe08217a1ca34223b8597cd41db24d6ffe52e';
-const EVENT_PACKAGE_ID = '0x681b894c304cf148494cf2f1ab792e918cd83e510cb7fe2e912b5098d855851d';
+const RUNTIME_PACKAGE_ID = '0x438eab12b59b366c113c54e864c34232c4514002043081747aff7a0de6c293f0';
+const EVENT_PACKAGE_ID = '0x438eab12b59b366c113c54e864c34232c4514002043081747aff7a0de6c293f0';
 
 // Enumerate the dynamic object fields (i.e. items) of a Kiosk object. Kiosk items
 // are stored as dynamic fields on the Kiosk object keyed by item object id.
