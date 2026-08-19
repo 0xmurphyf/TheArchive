@@ -1435,6 +1435,13 @@ function handleWalletChanged(connection){
   wizardFilter='all';
   currentStep=1;
   if(typeof window.renderStep==='function')window.renderStep();
+  const filterTabs=document.getElementById('objectFilter');
+  if(filterTabs){
+    filterTabs.style.display='none';
+    filterTabs.querySelectorAll('.filter-tab').forEach(x=>x.classList.toggle('selected',x.dataset.kind==='all'));
+  }
+  const searchInput=document.getElementById('objectSearch');
+  if(searchInput)searchInput.value='';
   const grid=document.getElementById('objectGrid');
   if(grid)grid.innerHTML='<div class="chain-empty loading">Loading your Mainnet objects…</div>';
   if(grid)refreshWizardObjects(address);
