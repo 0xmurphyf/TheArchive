@@ -1485,9 +1485,15 @@ function objectCannotContinue(o){
   if(!o || !o.objectId)return false;
   if(Boolean(o.noStore))return true;
   if(isSuiCoin(o))return true;
+  // Kiosk / locked items. We cannot rely solely on the `inKiosk`/`kiosk` flags
+  // because those are only attached when the wallet-side kiosk field scan
+  // succeeds; objects that arrive only from the indexer (or after an
+  // incomplete scan) only carry `indexer.kioskId` or an ownership status.
+  // Cover all of those so "Hide unarchivable" actually hides them.
   const inKiosk=Boolean(
     o.kioskId||o.kioskOwnerCapId||o.kiosk||o.ownerObjectId||o.inKiosk||
-    o.ownershipStatus==='Locked in Kiosk'
+    o.indexer?.kioskId||o.ownershipStatus==='Locked in Kiosk'||
+    o.ownershipStatus==='In Kiosk'||o.ownershipStatus==='Personal Kiosk'
   );
   if(inKiosk)return true;
   const special=Boolean(
