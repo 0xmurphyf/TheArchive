@@ -1922,12 +1922,19 @@ async function enrichObjectStoreStatus(objects){
   await Promise.all(Array.from({length:Math.min(8,candidates.length)},worker));
   if(candidates.some(object=>object.noStore))renderFilteredObjects();
 }
-function loadWizardObjects(){
+async function loadWizardObjects(){
   const grid=document.getElementById("objectGrid");
   const connection=window.theArchiveWallet?.getConnection?.();
   if(!connection){
     grid.innerHTML='<div class="chain-empty">Connect a wallet first, then return here.</div>';
     return;
+  }
+  // Guard the async module race (same class of bug fixed in KioskManager):
+  // theArchiveTx is a dynamic import and handleWalletChanged -> refreshWizardObjects
+  // can reach here before it has loaded. Await it; bail gracefully if still missing.
+  if(!window.theArchiveTx){
+    try{ await window.theArchiveModuleLoader?.loadArchiveModules?.(); }catch(_){}
+    if(!window.theArchiveTx){ showToast('Archive tools are still loading. Try again in a moment.'); return; }
   }
   if(!window.theArchiveTx.isMainnetAccount(connection)){
     grid.innerHTML='<div class="chain-empty">Connected wallet is not on Sui Mainnet. Reconnect with Mainnet enabled.</div>';
