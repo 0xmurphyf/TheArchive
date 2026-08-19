@@ -1413,6 +1413,7 @@ let wizardObjectsLoaded=false;
 // otherwise wipe the typed value and silently archive the whole coin.
 const coinAmountValues=new Map();
 let wizardObjects=[];
+let wizardLoadToken=0;
 let wizardScanIncomplete=false;
 let wizardFilter='all';
 let wizardHideUnarchivable=true; // when true, hide objects that cannot be archived (NO STORE / SUI / Kiosk / special ownership)
@@ -1434,7 +1435,9 @@ function handleWalletChanged(connection){
   wizardFilter='all';
   currentStep=1;
   if(typeof window.renderStep==='function')window.renderStep();
-  if(document.getElementById('objectGrid'))refreshWizardObjects();
+  const grid=document.getElementById('objectGrid');
+  if(grid)grid.innerHTML='<div class="chain-empty loading">Loading your Mainnet objects…</div>';
+  if(grid)refreshWizardObjects(address);
 }
 window.handleWalletChanged=handleWalletChanged;
 let archivePolicy=null;
@@ -2007,14 +2010,21 @@ async function enrichObjectStoreStatus(objects){
   await Promise.all(Array.from({length:Math.min(8,candidates.length)},worker));
   if(candidates.some(object=>object.noStore))renderFilteredObjects();
 }
-async function loadWizardObjects(){
+async function loadWizardObjects(targetAddress){
   const grid=document.getElementById("objectGrid");
-  const connection=window.theArchiveWallet?.getConnection?.();
-  if(!connection){
+  // Use the address the caller intends (wallet switch / refresh), not whatever
+  // getConnection() may still report mid-transition — otherwise a switch without
+  // a page reload fetches the PREVIOUS wallet's objects.
+  const connection=targetAddress
+    ? { address: targetAddress }
+    : window.theArchiveWallet?.getConnection?.();
+  if(!connection?.address){
     grid.innerHTML='<div class="chain-empty">Connect a wallet first, then return here.</div>';
     return;
   }
-  // Guard the async module race (same class of bug fixed in KioskManager):
+  // Bump the load token so a slow in-flight fetch for a previous wallet is
+  // discarded instead of overwriting the current wallet's objects.
+  const myToken=++wizardLoadToken;
   // theArchiveTx is a dynamic import and handleWalletChanged -> refreshWizardObjects
   // can reach here before it has loaded. Await it; bail gracefully if still missing.
   if(!window.theArchiveTx){
@@ -2102,6 +2112,9 @@ async function loadWizardObjects(){
       return true;
     });
     wizardObjects=objects;
+    // Stale guard: if another wallet switch/refresh happened while this fetch
+    // was in flight, drop the result so the old wallet's objects never land.
+    if(myToken!==wizardLoadToken)return;
     if(!objects.length){
       grid.innerHTML=`${wizardScanIncomplete?'<div class="chain-empty scan-incomplete-notice">Scan incomplete. Enter an Object ID above to add a missing object.</div>':''}<div class="chain-empty">No objects found in this wallet. Mint or receive a Mainnet object first.</div>`;
       return;
@@ -2184,9 +2197,9 @@ async function loadObjectById(){
 }
 // Re-fetch the wallet's objects on demand (Refresh button), bypassing the
 // "already loaded" short-circuit used by the normal step navigation.
-function refreshWizardObjects(){
+function refreshWizardObjects(targetAddress){
   wizardObjectsLoaded=false;
-  loadWizardObjects();
+  loadWizardObjects(targetAddress);
 }
 function utf8ByteLength(value){return new TextEncoder().encode(String(value??'')).length;}
 async function fetchMoveAbilities(type){
