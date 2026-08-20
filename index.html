@@ -175,13 +175,8 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
 .filter-tab{background:transparent;border:1px solid var(--line);color:var(--dim);padding:8px 14px;font:11px "Courier New",monospace;letter-spacing:.08em;cursor:pointer}
 .filter-tab.selected{border-color:var(--paper);color:var(--paper)}
 .toggle-btn.off{border-color:var(--line);color:var(--dim);opacity:.7}
-.coin-amount{margin-top:12px;text-align:left;font:11px "Courier New",monospace;color:var(--dim);display:flex;flex-direction:column;gap:6px}
-.coin-amount .coin-mode{display:flex;gap:4px}
-.coin-mode-btn{flex:1;background:#1a1a16;border:1px solid var(--line);color:var(--dim);padding:5px 6px;font:700 9px "Courier New",monospace;letter-spacing:.06em;cursor:pointer;border-radius:3px}
-.coin-mode-btn.active{border-color:var(--paper);color:var(--paper);background:#26261f}
-.coin-amount .coin-partial{display:flex;flex-direction:column;gap:3px}
-.coin-amount input{margin-top:2px;background:#0f0f0d;border:1px solid var(--line);color:var(--paper);padding:7px 9px;font-family:inherit;width:100%}
-.confirm-coin-amt{display:block;margin-top:4px;font-weight:700}
+.coin-amount{margin-top:12px;text-align:left;font:11px "Courier New",monospace;color:var(--dim);display:flex;flex-direction:column;gap:4px}
+.coin-amount input{margin-top:2px;background:#0f0f0d;border:1px solid var(--line);color:var(--paper);padding:7px 9px;font-family:inherit}
 .storage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:16px}
 .option{
   border:1px solid var(--line);background:#11110e;color:var(--paper);
@@ -1590,23 +1585,8 @@ function appendObjectCard(grid,obj,focused=false){
   else if(specialOwnership)extra+=`<div class="object-state-kiosk"><a href="https://kiosk.voxxinc.xyz" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">◆ LISTED / OBJECT CONTROLLED</a></div>`;
   if(obj.isCoin){
     const fullSUI = obj.balance!==undefined ? Number(obj.balance)/1e9 : 0;
-    const saved=coinAmountValues.get(obj.objectId);
-    // Default to a SMALL partial freeze (0.12 SUI, or 10% if balance is tiny)
-    // rather than the whole coin. Whole-coin archival is opt-in via the toggle.
-    const suggested = fullSUI>0.12 ? 0.12 : (fullSUI>0 ? Math.max(fullSUI*0.1, 1e-8) : 0);
-    const mode = saved?.mode || 'partial';
-    const amt = saved?.amount!==undefined ? saved.amount : (mode==='partial'? suggested : fullSUI);
-    const stays = Math.max(fullSUI-amt,0);
-    extra+=`<div class="coin-amount" data-coin="1" onclick="event.stopPropagation()">
-      <div class="coin-mode">
-        <button type="button" class="coin-mode-btn${mode==='partial'?' active':''}" data-mode="partial" onclick="setCoinMode('${obj.objectId}','partial',this)">Freeze part</button>
-        <button type="button" class="coin-mode-btn${mode==='whole'?' active':''}" data-mode="whole" onclick="setCoinMode('${obj.objectId}','whole',this)">Freeze all</button>
-      </div>
-      <div class="coin-partial"${mode==='whole'?' style="display:none"':''}>
-        <input type="number" min="0" max="${fullSUI}" step="0.000000001" placeholder="Amount to freeze" data-balance="${obj.balance!==undefined?obj.balance:''}" value="${mode==='partial'?amt:''}">
-        <span class="muted">of ${fullSUI.toFixed(4)} · ${stays.toFixed(4)} stays</span>
-      </div>
-    </div>`;
+    const savedVal = coinAmountValues.get(obj.objectId) || '';
+    extra+=`<div class="coin-amount" onclick="event.stopPropagation()"><label>Amount</label><input type="number" min="0" max="${fullSUI}" step="0.000000001" placeholder="Default archive all" data-balance="${obj.balance!==undefined?obj.balance:''}" value="${savedVal}" disabled><span class="muted">max ${fullSUI.toFixed(4)}</span></div>`;
   }
   const alert=blocked?'⛔':locked?'🔒':'';
   const thumb=cardImageUrl?`<img src="${escapeHtml(cardImageUrl)}" alt="" onerror="${obj.isCoin?'fallbackCoinImage(event)':'fallbackObjectImage(event)'}">`:obj.isCoin?`<div class="coin-glyph">${escapeHtml(label.slice(0,6))}</div>`:kind.slice(0,4);
@@ -1615,9 +1595,8 @@ function appendObjectCard(grid,obj,focused=false){
     const amtInput=card.querySelector('.coin-amount input');
     if(amtInput)amtInput.addEventListener('input',()=>{
       const v=amtInput.value.trim();
-      const prev=coinAmountValues.get(obj.objectId)||{mode:'partial'};
       if(v==='')coinAmountValues.delete(obj.objectId);
-      else coinAmountValues.set(obj.objectId,{mode:prev.mode||'partial',amount:Number(v)});
+      else coinAmountValues.set(obj.objectId,v);
     });
   }
   grid.appendChild(card);
@@ -1843,27 +1822,6 @@ async function nextStep(){
   renderStep();
 }
 function prevStep(){currentStep--; if(currentStep===4)currentStep--; renderStep()}
-function setCoinMode(objectId,mode,btn){
-  const wrap=btn?.closest('.coin-amount');
-  if(!wrap)return;
-  wrap.querySelectorAll('.coin-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
-  const partial=wrap.querySelector('.coin-partial');
-  if(partial)partial.style.display=mode==='whole'?'none':'';
-  const input=wrap.querySelector('input');
-  const full=input?.dataset.balance?Number(input.dataset.balance)/1e9:0;
-  const prev=coinAmountValues.get(objectId)||{};
-  if(mode==='whole'){
-    if(input)input.value='';
-    coinAmountValues.set(objectId,{mode:'whole',amount:full});
-  }else{
-    const suggested=full>0.12?0.12:(full>0?Math.max(full*0.1,1e-8):0);
-    if(input)input.value=String(prev.amount??suggested);
-    coinAmountValues.set(objectId,{mode:'partial',amount:Number(input?.value||suggested)});
-  }
-  // If this coin card is the selected one, refresh the confirmation line.
-  const card=btn?.closest('.option');
-  if(card && card.classList.contains('selected'))setConfirmObject();
-}
 function selectObject(el){
   if(el.classList.contains('is-deleted'))return; // chain-confirmed gone -> not selectable
   document.querySelectorAll('[data-step="1"] .option').forEach(x=>x.classList.remove("selected"));
@@ -1891,22 +1849,15 @@ function setConfirmObject(){
   let idHtml=suiscanLink(selectedObjectId, selectedObjectId.slice(0,10)+"…");
   if(isCoin){
     const balRaw=card?.dataset.balance?BigInt(card.dataset.balance):0n;
+    const amtInput=card?.querySelector('.coin-amount input');
+    const raw=amtInput && amtInput.value.trim()!=='' ? Number(amtInput.value) : 0;
     const fullSUI=balRaw? Number(balRaw)/1e9 : 0;
-    const saved=coinAmountValues.get(selectedObjectId);
-    const mode=saved?.mode||'partial';
-    let frozenSUI, staysSUI;
-    if(mode==='whole' || saved?.amount===undefined){
-      frozenSUI=fullSUI; staysSUI=0;
-    }else{
-      const raw=Number(saved.amount)||0;
+    if(raw>0){
       const mist=BigInt(Math.floor(raw*1e9+1e-6));
-      frozenSUI = (balRaw===0n || mist>=balRaw) ? fullSUI : raw;
-      staysSUI = Math.max(fullSUI-frozenSUI,0);
-    }
-    if(mode==='whole' || frozenSUI>=fullSUI){
-      idHtml+=`<span class="confirm-coin-amt">Whole coin · ${fullSUI.toFixed(4)} SUI frozen forever</span>`;
+      const partial = balRaw===0n || mist>=balRaw ? fullSUI : raw;
+      idHtml+=`<span class="confirm-coin-amt">Archive ${partial.toFixed(4)} of ${fullSUI.toFixed(4)}</span>`;
     }else{
-      idHtml+=`<span class="confirm-coin-amt">Freeze ${frozenSUI.toFixed(4)} SUI forever · ${staysSUI.toFixed(4)} stays in wallet</span>`;
+      idHtml+=`<span class="confirm-coin-amt">Whole coin · ${fullSUI.toFixed(4)}</span>`;
     }
   }
   if(idEl) idEl.innerHTML=idHtml;
@@ -2479,15 +2430,13 @@ async function completeArchive(){
     let amount;
     const selCard=document.querySelector('[data-step="1"] .option.selected');
     if(selCard && selCard.dataset.isCoin==='1'){
-      const saved=coinAmountValues.get(selectedObjectId);
-      const mode=saved?.mode||'partial';
-      const raw=saved?.amount!==undefined ? Number(saved.amount) : 0;
-      if(mode==='whole' || raw<=0){
-        amount=undefined; // whole coin
-      }else{
+      const amtInput=selCard.querySelector('.coin-amount input');
+      const raw=amtInput && amtInput.value.trim()!=='' ? Number(amtInput.value) : 0;
+      if(raw>0){
         const bal=selCard.dataset.balance?BigInt(selCard.dataset.balance):0n;
+        // Use BigInt-safe rounding: round(SUI*1e9) via string math to avoid float error.
         const mist=BigInt(Math.floor(raw*1e9 + 1e-6));
-        if(bal===0n || mist>=bal) amount=undefined; // entered >= full -> whole
+        if(bal===0n || mist>=bal) amount=undefined; // whole coin
         else amount=mist; // partial split
       }
     }
