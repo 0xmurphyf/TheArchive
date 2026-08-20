@@ -2090,7 +2090,7 @@ async function loadWizardObjects(targetAddress){
         resolvableManualIds.add(id);
       }catch(error){
         const text=String(error?.message||error||'').toLowerCase();
-        const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
+        const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable|could not load|not exist|gone|removed|object is null|not be found/i.test(text);
         if(gone)deletedManualIds.add(id); // definitively gone -> mark deleted
         else resolvableManualIds.add(id); // uncertain (network) -> keep
       }
@@ -2116,7 +2116,7 @@ async function loadWizardObjects(targetAddress){
           resolvableStaleIds.add(String(id).toLowerCase());
         }catch(error){
           const text=String(error?.message||error||'').toLowerCase();
-          const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
+          const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable|could not load|not exist|gone|removed|object is null|not be found/i.test(text);
           if(gone)deletedStaleIds.add(String(id).toLowerCase()); // definitively gone -> mark deleted
           else resolvableStaleIds.add(String(id).toLowerCase()); // uncertain -> keep
         }

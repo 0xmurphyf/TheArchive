@@ -426,10 +426,17 @@ export async function fetchObjectById(client, objectId) {
   const include = client.core ? { json: true, display: true } : { content: true, display: true };
   return withRetry(async () => {
     const result = await getObject({ objectId, include });
+    // Some transports return `null` (or an empty object) instead of throwing when
+    // the object does not exist on-chain (e.g. GraphQL `object` is null). Normalize
+    // that to a fixed "object not found" error so callers (the deleted-object
+    // detection in index.html) reliably recognize a gone object.
+    if (!result || result?.object == null && result?.data == null && result?.objectId == null && result?.data?.objectId == null) {
+      throw new Error('Object not found');
+    }
     const object = result?.object ?? result?.data ?? result;
     const described = describeObject(object);
     if (!described.objectId || described.type === 'Unknown object') {
-      throw new Error('Object metadata is unavailable');
+      throw new Error('Object not found');
     }
     return described;
   });
