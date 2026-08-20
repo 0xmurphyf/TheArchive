@@ -2086,7 +2086,36 @@ async function loadWizardObjects(targetAddress){
         // gone -> omit from resolvableManualIds -> dropped below
       }
     }));
-    const previousById=new Map((wizardScanIncomplete?wizardObjects:manualObjects).filter(object=>object?.objectId).map(object=>[String(object.objectId).toLowerCase(),object]));
+    // When the fresh scan was incomplete we must NOT blindly preserve the
+    // entire prior list (that keeps objects other dapps deleted). Keep manually
+    // added objects, and re-probe only the *difference* — prior objects that the
+    // fresh scan did not return — once each; definitively gone ones are dropped.
+    let previousById;
+    if(wizardScanIncomplete){
+      const freshIds=new Set([...byId.keys()].map(id=>String(id).toLowerCase()));
+      const staleObjects=wizardObjects.filter(object=>object?.objectId && !freshIds.has(String(object.objectId).toLowerCase()));
+      const resolvableStaleIds=new Set();
+      await Promise.all(staleObjects.map(async(object)=>{
+        const id=object.objectId;
+        if(manualIds.has(id)){resolvableStaleIds.add(String(id).toLowerCase());return;} // manual kept below
+        if(archivedIds.has(String(id||'').toLowerCase()))return; // archived -> drop
+        try{
+          await window.theArchiveTx.fetchObjectById(client,id);
+          resolvableStaleIds.add(String(id).toLowerCase());
+        }catch(error){
+          const text=String(error?.message||error||'').toLowerCase();
+          const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
+          if(!gone)resolvableStaleIds.add(String(id).toLowerCase()); // uncertain -> keep
+        }
+      }));
+      previousById=new Map(
+        [...manualObjects,...staleObjects]
+          .filter(object=>object?.objectId && resolvableStaleIds.has(String(object.objectId).toLowerCase()))
+          .map(object=>[String(object.objectId).toLowerCase(),object])
+      );
+    } else {
+      previousById=new Map(manualObjects.filter(object=>object?.objectId).map(object=>[String(object.objectId).toLowerCase(),object]));
+    }
     const mergedById=new Map(previousById);
     for(const [id,incoming] of byId){
       const previous=previousById.get(String(id).toLowerCase());

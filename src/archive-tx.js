@@ -23,7 +23,7 @@ const KIOSK_FIELDS_QUERY = `
       dynamicFields(first: 50, after: $cursor) {
         nodes {
           name { type { repr } json }
-          value { ... on MoveObject { address } }
+          value { ... on MoveObject { address contents { json type { repr } } } }
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -566,28 +566,25 @@ export async function fetchOwnedObjects(client, address) {
             // address and are skipped.
             const itemId=objectIdValue(node?.value?.address||node?.value);
             if (!itemId || seen.has(itemId)) return;
-            const existingItemContext=kioskItemContext.get(itemId);
-            kioskItemContext.set(itemId, {
-              kioskId,
-              kioskOwnerCapId:kioskCapByKiosk.get(kioskId)?.capObjectId||existingItemContext?.kioskOwnerCapId||'',
-              kioskCapKind:kioskCapByKiosk.get(kioskId)?.kind||existingItemContext?.kioskCapKind||'',
-              kioskInnerCapId:kioskCapByKiosk.get(kioskId)?.innerCapId||existingItemContext?.kioskInnerCapId||'',
-              kioskCapOwner:kioskCapByKiosk.get(kioskId)?.capOwner||existingItemContext?.kioskCapOwner||'',
-              locked: Boolean(existingItemContext?.locked || lockedItems.has(itemId)),
-            });
-            try {
-              const obj = await retryScanRequest(() => getObject({ objectId: itemId, include }));
-              // gRPC getObject returns { object: <flat> }, JSON-RPC returns
-              // { data: <flat> }; normalize to the flat object shape used by
-              // the rest of this function and by describeObject.
-              const o = obj?.object ?? obj?.data ?? obj;
-              const objType = o?.type || o?.objectType || '';
-              if (!/::kiosk::Kiosk(?:OwnerCap|Cap)(?:<|$)/.test(objType)) {
-                collected.push(o);
-                seen.add(itemId);
-              }
-            } catch (objErr) {
-              throw new Error(`Kiosk item ${itemId} could not be loaded: ${objErr.message || objErr}`);
+            // Build the item object directly from the kiosk field enumeration's
+            // embedded contents — NO per-item getObject call. Previously every
+            // kiosk item triggered an extra RPC, which fanned out to 100+ requests
+            // for a single big kiosk and tripped Mainnet rate limits (leaving the
+            // scan "incomplete" and stale deleted objects preserved).
+            const itemValue = node?.value?.contents || {};
+            const itemType = itemValue?.type?.repr || '';
+            const itemJson = itemValue?.json || {};
+            const itemObject = {
+              objectId: itemId,
+              type: itemType,
+              version: '',
+              digest: '',
+              content: { json: itemJson, type: itemType },
+              display: null,
+            };
+            if (!/::kiosk::Kiosk(?:OwnerCap|Cap)(?:<|$)/.test(itemType)) {
+              collected.push(itemObject);
+              seen.add(itemId);
             }
           });
           fieldCursor = conn?.pageInfo?.hasNextPage ? conn?.pageInfo?.endCursor : null;
