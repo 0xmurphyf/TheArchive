@@ -188,6 +188,8 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
 .option.selected{border-color:var(--paper)}
 .object-grid .option{box-sizing:border-box;height:280px;min-height:280px;overflow:hidden;display:flex;flex-direction:column;gap:0;position:relative}
 .object-grid .option.is-kiosk,.object-grid .option.is-special-ownership{border-color:#c48a45}.object-grid .option.is-no-store{border-color:#b86b5d}.object-grid .option.is-locked,.object-grid .option.is-blocked{border-color:#b86b5d}
+.object-grid .option.is-deleted{opacity:.45;filter:grayscale(1);border-color:#5a5a5a!important;cursor:not-allowed}
+.object-grid .option.is-deleted .object-thumb{opacity:.5}
 .object-alert{position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:28px;height:28px;border:1px solid #b86b5d;border-radius:50%;background:#17110f;color:#e7a08e;font-size:15px;line-height:1}
 .object-alert[title]{cursor:help}
 .object-state-warning{display:block;margin-top:5px;padding:5px 7px;background:#3a1b18;color:#ffd1c5;border:1px solid #b86b5d;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-kiosk{display:block;margin-top:5px;padding:5px 7px;background:#3b2a16;color:#ffd79b;border:1px solid #c48a45;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-warning a,.object-state-kiosk a{color:inherit;text-decoration:underline;text-underline-offset:2px}
@@ -1494,6 +1496,7 @@ function setObjectFilter(kind,el){
 function objectCannotContinue(o){
   if(!o || !o.objectId)return false;
   if(Boolean(o.noStore))return true;
+  if(Boolean(o.deleted))return true; // chain-confirmed gone -> treat as unarchivable
   if(isSuiCoin(o))return true;
   // Kiosk / locked items. We cannot rely solely on the `inKiosk`/`kiosk` flags
   // because those are only attached when the wallet-side kiosk field scan
@@ -1545,8 +1548,9 @@ function appendObjectCard(grid,obj,focused=false){
   const noStore=Boolean(obj.noStore);
   const locked=Boolean(obj.locked);
   const blocked=Boolean(obj.blocked);
+  const deleted=Boolean(obj.deleted);
   const card=document.createElement('div');
-  card.className=`option${focused?' manual-focused':''}${inKiosk?' is-kiosk':''}${specialOwnership?' is-special-ownership':''}${noStore?' is-no-store':''}${locked?' is-locked':''}${blocked?' is-blocked':''}`;
+  card.className=`option${focused?' manual-focused':''}${inKiosk?' is-kiosk':''}${specialOwnership?' is-special-ownership':''}${noStore?' is-no-store':''}${locked?' is-locked':''}${blocked?' is-blocked':''}${deleted?' is-deleted':''}`;
   card.dataset.objectId=obj.objectId;
   card.dataset.type=obj.type;
   card.dataset.image=cardImageUrl;
@@ -1564,11 +1568,14 @@ function appendObjectCard(grid,obj,focused=false){
   card.dataset.inKiosk=inKiosk?'1':'';
   card.dataset.specialOwnership=specialOwnership?'1':'';
   card.dataset.noStore=noStore?'1':'';
+  card.dataset.deleted=deleted?'1':'';
   card.onclick=()=>selectObject(card);
   let stateLabel=obj.manual?'LOOKED UP BY ID':blocked?'BLOCKED':specialOwnership?'LISTED / OBJECT CONTROLLED':obj.kiosk?'KIOSK ITEM':'';
   if(obj.noStore)stateLabel='NO STORE';
-  let extra=stateLabel?`<div class="object-status"><span class="status-pill ${(blocked||noStore)?'status-blocked':''}">${noStore?'⚠ NO STORE':blocked?'⛔ BLOCKED':locked?'🔒 LOCKED':escapeHtml(stateLabel)}</span></div>`:'';
+  if(deleted)stateLabel='DELETED';
+  let extra=stateLabel?`<div class="object-status"><span class="status-pill ${(blocked||noStore||deleted)?'status-blocked':''}">${deleted?'🗑 DELETED':noStore?'⚠ NO STORE':blocked?'⛔ BLOCKED':locked?'🔒 LOCKED':escapeHtml(stateLabel)}</span></div>`:'';
   if(noStore)extra+=`<div class="object-state-warning">⚠ NO STORE CANNOT ARCHIVE</div>`;
+  else if(deleted)extra+=`<div class="object-state-warning">🗑 No longer exists on-chain</div>`;
   else if(blocked)extra+=`<div class="object-state-warning">⛔ BLOCKED BY SUI DENYLIST</div>`;
   else if(locked)extra+=`<div class="object-state-warning"><a href="https://kiosk.voxxinc.xyz" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔒 LOCKED TAKE OUT FIRST</a></div>`;
   else if(inKiosk&&personalKiosk)extra+=`<div class="object-state-kiosk"><a href="https://kiosk.voxxinc.xyz" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">◆ PERSONAL KIOSK · TAKE OUT TO WALLET</a></div>`;
@@ -1800,6 +1807,7 @@ async function nextStep(){
 }
 function prevStep(){currentStep--; if(currentStep===4)currentStep--; renderStep()}
 function selectObject(el){
+  if(el.classList.contains('is-deleted'))return; // chain-confirmed gone -> not selectable
   document.querySelectorAll('[data-step="1"] .option').forEach(x=>x.classList.remove("selected"));
   el.classList.add("selected");
   document.querySelectorAll('[data-step="1"] .coin-amount input').forEach(input=>{
@@ -2073,6 +2081,7 @@ async function loadWizardObjects(targetAddress){
     // once; network errors are treated as "keep" (don't hide on transient
     // failure), only a definitive not-found drops it.
     const resolvableManualIds=new Set();
+    const deletedManualIds=new Set();
     await Promise.all(manualObjects.map(async(object)=>{
       const id=object.objectId;
       if(archivedIds.has(String(id||'').toLowerCase()))return; // archived -> drop
@@ -2082,19 +2091,22 @@ async function loadWizardObjects(targetAddress){
       }catch(error){
         const text=String(error?.message||error||'').toLowerCase();
         const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
-        if(!gone)resolvableManualIds.add(id); // uncertain (network) -> keep
-        // gone -> omit from resolvableManualIds -> dropped below
+        if(gone)deletedManualIds.add(id); // definitively gone -> mark deleted
+        else resolvableManualIds.add(id); // uncertain (network) -> keep
       }
     }));
     // When the fresh scan was incomplete we must NOT blindly preserve the
     // entire prior list (that keeps objects other dapps deleted). Keep manually
     // added objects, and re-probe only the *difference* — prior objects that the
-    // fresh scan did not return — once each; definitively gone ones are dropped.
+    // fresh scan did not return — once each. Definitively gone ones are marked
+    // `deleted` (shown greyed, hidden when "Hide unarchivable" is ON) rather
+    // than silently dropped; network-uncertain ones are kept as-is.
     let previousById;
     if(wizardScanIncomplete){
       const freshIds=new Set([...byId.keys()].map(id=>String(id).toLowerCase()));
       const staleObjects=wizardObjects.filter(object=>object?.objectId && !freshIds.has(String(object.objectId).toLowerCase()));
       const resolvableStaleIds=new Set();
+      const deletedStaleIds=new Set();
       await Promise.all(staleObjects.map(async(object)=>{
         const id=object.objectId;
         if(manualIds.has(id)){resolvableStaleIds.add(String(id).toLowerCase());return;} // manual kept below
@@ -2105,16 +2117,32 @@ async function loadWizardObjects(targetAddress){
         }catch(error){
           const text=String(error?.message||error||'').toLowerCase();
           const gone=/not found|does not exist|unknown object|deleted|no object|metadata is unavailable/.test(text);
-          if(!gone)resolvableStaleIds.add(String(id).toLowerCase()); // uncertain -> keep
+          if(gone)deletedStaleIds.add(String(id).toLowerCase()); // definitively gone -> mark deleted
+          else resolvableStaleIds.add(String(id).toLowerCase()); // uncertain -> keep
         }
       }));
+      const flagMap=new Map(manualObjects.map(o=>[String(o.objectId).toLowerCase(),deletedManualIds.has(o.objectId)?{deleted:true}:null]));
+      for(const o of staleObjects){
+        const key=String(o.objectId).toLowerCase();
+        if(deletedStaleIds.has(key))flagMap.set(key,{deleted:true});
+        else if(resolvableStaleIds.has(key))flagMap.set(key,null);
+      }
       previousById=new Map(
         [...manualObjects,...staleObjects]
-          .filter(object=>object?.objectId && resolvableStaleIds.has(String(object.objectId).toLowerCase()))
-          .map(object=>[String(object.objectId).toLowerCase(),object])
+          .filter(object=>object?.objectId && (resolvableStaleIds.has(String(object.objectId).toLowerCase())||deletedStaleIds.has(String(object.objectId).toLowerCase())||deletedManualIds.has(object.objectId)))
+          .map(object=>{
+            const key=String(object.objectId).toLowerCase();
+            const flag=flagMap.get(key);
+            return [key, flag?{...object,...flag}:object];
+          })
       );
     } else {
-      previousById=new Map(manualObjects.filter(object=>object?.objectId).map(object=>[String(object.objectId).toLowerCase(),object]));
+      // Scan complete: manually-added objects that are definitively gone are
+      // also marked deleted (not dropped) so the user sees what disappeared.
+      previousById=new Map(manualObjects.map(object=>{
+        const key=String(object.objectId).toLowerCase();
+        return [key, deletedManualIds.has(object.objectId)?{...object,deleted:true}:object];
+      }));
     }
     const mergedById=new Map(previousById);
     for(const [id,incoming] of byId){
@@ -2131,6 +2159,7 @@ async function loadWizardObjects(targetAddress){
         locked:incoming.locked??previous.locked,
         blocked:incoming.blocked??previous.blocked,
         noStore:incoming.noStore??previous.noStore,
+        deleted:incoming.deleted??previous.deleted,
         kioskId:incoming.kioskId||previous.kioskId,
         kioskOwnerCapId:incoming.kioskOwnerCapId||previous.kioskOwnerCapId,
         kioskCapKind:incoming.kioskCapKind||previous.kioskCapKind,
@@ -2144,7 +2173,12 @@ async function loadWizardObjects(targetAddress){
     const objects=[...mergedById.values()].filter(object=>{
       const id=String(object.objectId||'').toLowerCase();
       if(archivedIds.has(id))return false; // archived -> hide
-      if(manualIds.has(object.objectId))return resolvableManualIds.has(object.objectId); // manual: only if still resolvable
+      if(manualIds.has(object.objectId)){
+        // Manual objects: keep if resolvable OR definitively deleted (so the
+        // user sees what disappeared); drop only if neither (transient failure
+        // already kept it via resolvableManualIds, so this keeps it).
+        return resolvableManualIds.has(object.objectId) || object.deleted;
+      }
       return true;
     });
     wizardObjects=objects;
