@@ -190,6 +190,8 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
 .object-grid .option.is-kiosk,.object-grid .option.is-special-ownership{border-color:#c48a45}.object-grid .option.is-no-store{border-color:#b86b5d}.object-grid .option.is-locked,.object-grid .option.is-blocked{border-color:#b86b5d}
 .object-grid .option.is-deleted{opacity:.45;filter:grayscale(1);border-color:#5a5a5a!important;cursor:not-allowed}
 .object-grid .option.is-deleted .object-thumb{opacity:.5}
+.object-count{margin:10px 2px 0;font:600 11px "Courier New",monospace;letter-spacing:.08em;color:#b9a18f;text-transform:uppercase}
+.object-loadmore{display:flex;justify-content:center;margin:14px 0 4px}
 .object-alert{position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:28px;height:28px;border:1px solid #b86b5d;border-radius:50%;background:#17110f;color:#e7a08e;font-size:15px;line-height:1}
 .object-alert[title]{cursor:help}
 .object-state-warning{display:block;margin-top:5px;padding:5px 7px;background:#3a1b18;color:#ffd1c5;border:1px solid #b86b5d;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-kiosk{display:block;margin-top:5px;padding:5px 7px;background:#3b2a16;color:#ffd79b;border:1px solid #c48a45;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-warning a,.object-state-kiosk a{color:inherit;text-decoration:underline;text-underline-offset:2px}
@@ -520,7 +522,7 @@ body.wallet-open{overflow:hidden}
       <p>Select an object currently under your full control to permanently freeze.<br><strong>Once frozen, it will be removed from your ownership and can never be recovered.</strong></p>
       <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" onclick="refreshWizardObjects()">Scan and Refresh</button><button class="btn toggle-btn" type="button" id="hideUnarchivableBtn" aria-pressed="true" onclick="toggleHideUnarchivable(this)">Hide unarchivable: ON</button></div>
       <div class="object-controls">
-        <input type="text" id="objectSearch" placeholder="Search by name or object ID…" oninput="renderFilteredObjects()">
+        <input type="text" id="objectSearch" placeholder="Search by name or object ID…" oninput="wizardRenderedCount=0;renderFilteredObjects()">
         <div class="filter-tabs" id="objectFilter">
           <button class="filter-tab selected" data-kind="all" onclick="setObjectFilter('all',this)">All</button>
           <button class="filter-tab" data-kind="nft" onclick="setObjectFilter('nft',this)">NFT</button>
@@ -532,6 +534,8 @@ body.wallet-open{overflow:hidden}
         <button class="btn" type="button" id="loadObjectByIdBtn" onclick="loadObjectById()">Add Object ID</button>
       </div>
       <div class="object-grid" id="objectGrid"><div class="chain-empty">Connect a wallet to load your Mainnet objects.</div></div>
+      <div class="object-count" id="objectCount" hidden></div>
+      <div class="object-loadmore" id="objectLoadMore" hidden><button class="btn" type="button" onclick="loadMoreObjects()">Load more</button></div>
       <div class="step-footer"><button class="btn primary" id="objectNext" onclick="nextStep()" disabled>Continue</button></div>
     </div>
 
@@ -1421,6 +1425,9 @@ let wizardFilter='all';
 let wizardHideUnarchivable=true; // when true, hide objects that cannot be archived (NO STORE / SUI / Kiosk / special ownership)
 let wizardCollection=null;
 let wizardFocusedObjectId=null;
+// Pagination for large wallets: only render the first page of cards at a time.
+const WIZARD_PAGE_SIZE=60;
+let wizardRenderedCount=0;
 let lastWizardWalletAddress=null;
 function handleWalletChanged(connection){
   const address=String(connection?.address||'').toLowerCase();
@@ -1487,6 +1494,7 @@ function setObjectFilter(kind,el){
   if(wizardObjects.filter(o=>!isSuiCoin(o)).length<=1)return;
   wizardFilter=kind;
   wizardCollection=null;
+  wizardRenderedCount=0;
   document.querySelectorAll('#objectFilter .filter-tab').forEach(x=>x.classList.remove('selected'));
   el.classList.add('selected');
   renderFilteredObjects();
@@ -1518,6 +1526,7 @@ function objectCannotContinue(o){
 }
 function toggleHideUnarchivable(btn){
   wizardHideUnarchivable=!wizardHideUnarchivable;
+  wizardRenderedCount=0;
   if(btn){
     btn.classList.toggle('off',!wizardHideUnarchivable);
     btn.textContent=wizardHideUnarchivable?'Hide unarchivable: ON':'Hide unarchivable: OFF';
@@ -1536,8 +1545,8 @@ function objectCollection(o){
     cover:collection?.cover_url||o.imageUrl||'',
   };
 }
-function openObjectCollection(key){wizardCollection=key;renderFilteredObjects()}
-function closeObjectCollection(){wizardCollection=null;renderFilteredObjects()}
+function openObjectCollection(key){wizardCollection=key;wizardRenderedCount=0;renderFilteredObjects()}
+function closeObjectCollection(){wizardCollection=null;wizardRenderedCount=0;renderFilteredObjects()}
 function appendObjectCard(grid,obj,focused=false){
   const label=obj.name||obj.type.split('::').pop();
   const kind=obj.isCoin?'COIN':'OBJ';
@@ -1603,6 +1612,8 @@ function appendObjectCard(grid,obj,focused=false){
 function renderFilteredObjects(){
   const grid=document.getElementById('objectGrid');
   if(!grid)return;
+  const countBar=document.getElementById('objectCount');
+  const loadMore=document.getElementById('objectLoadMore');
   const filterTabs=document.getElementById('objectFilter');
   if(filterTabs){
     const showFilters=wizardObjects.filter(o=>!isSuiCoin(o)).length>1;
@@ -1610,7 +1621,8 @@ function renderFilteredObjects(){
     if(!showFilters)wizardFilter='all';
   }
   const q=(document.getElementById('objectSearch')?.value||'').trim().toLowerCase();
-  const list=wizardObjects.filter(o=>o.objectId).filter(o=>{
+  const all=wizardObjects.filter(o=>o.objectId);
+  const list=all.filter(o=>{
     if(wizardHideUnarchivable && objectCannotContinue(o))return false;
     const kind=objectKind(o);
     if(wizardFilter!=='all' && kind!==wizardFilter)return false;
@@ -1624,14 +1636,28 @@ function renderFilteredObjects(){
     }
     return true;
   });
-  if(!wizardObjects.some(o=>o.objectId)){
+  const total=all.length;
+  const hiddenByFilter=total-list.length;
+  if(!total){
+    if(countBar){countBar.hidden=true;}
+    if(loadMore){loadMore.hidden=true;}
     grid.innerHTML='<div class="chain-empty">No selectable objects found in this wallet.</div>';
     return;
   }
   if(!list.length){
-    grid.innerHTML='<div class="chain-empty">No objects match your search.</div>';
+    if(countBar){countBar.hidden=true;}
+    if(loadMore){loadMore.hidden=true;}
+    grid.innerHTML='<div class="chain-empty">No objects match your filters or search.</div>';
     return;
   }
+  // Pagination: render only the first WIZARD_PAGE_SIZE cards (plus the focused
+  // object). "Load more" appends the next page. wizardRenderedCount tracks how
+  // many of `list` are currently shown; reset to the page size on each full
+  // re-render (filter/search/refresh) but not when appending.
+  const renderFull=wizardRenderedCount===0||wizardRenderedCount>list.length;
+  if(renderFull)wizardRenderedCount=WIZARD_PAGE_SIZE;
+  wizardRenderedCount=Math.min(wizardRenderedCount,list.length);
+  const page=list.slice(0,wizardRenderedCount);
   grid.innerHTML='';
   if(wizardScanIncomplete){
     const notice=document.createElement('div');
@@ -1647,9 +1673,9 @@ function renderFilteredObjects(){
     back.onclick=closeObjectCollection;
     grid.appendChild(back);
   }
-  const focusedObject=wizardFocusedObjectId?list.find(o=>o.objectId===wizardFocusedObjectId):null;
+  const focusedObject=(wizardFocusedObjectId?page.find(o=>o.objectId===wizardFocusedObjectId):null)||(wizardFocusedObjectId?list.find(o=>o.objectId===wizardFocusedObjectId):null);
   if(focusedObject)appendObjectCard(grid,focusedObject,true);
-  const nfts=list.filter(o=>objectKind(o)==='nft' && o.objectId!==wizardFocusedObjectId);
+  const nfts=page.filter(o=>objectKind(o)==='nft' && o.objectId!==wizardFocusedObjectId);
   if(!wizardCollection && nfts.length){
     const groups=new Map();
     for(const obj of nfts){
@@ -1667,9 +1693,18 @@ function renderFilteredObjects(){
       grid.appendChild(card);
     }
   }
-  const otherObjects=(wizardCollection?list:list.filter(o=>objectKind(o)!=='nft')).filter(o=>o.objectId!==wizardFocusedObjectId);
+  const otherObjects=(wizardCollection?page:page.filter(o=>objectKind(o)!=='nft')).filter(o=>o.objectId!==wizardFocusedObjectId);
   for(const obj of otherObjects)appendObjectCard(grid,obj);
   if(wizardCollection && !otherObjects.length && !focusedObject)grid.innerHTML+='<div class="chain-empty">No NFTs found in this collection.</div>';
+  // Count bar: "Showing X of Y" plus a hint when filters hide the rest.
+  if(countBar){
+    let text=`Showing ${list.length} of ${total} object${total===1?'':'s'}`;
+    if(wizardHideUnarchivable && hiddenByFilter>0)text+=` · ${hiddenByFilter} hidden (unarchivable)`;
+    if(q)text=`${list.length} match${list.length===1?'':'es'} for “${escapeHtml(q)}” · ${total} total`;
+    countBar.textContent=text;
+    countBar.hidden=false;
+  }
+  if(loadMore){loadMore.hidden=wizardRenderedCount>=list.length;if(loadMore.firstElementChild)loadMore.firstElementChild.textContent=`Load more (${list.length-wizardRenderedCount} left)`;}
   // Re-apply the current selection + coin amount after rebuilding the grid,
   // so a re-render (filter, search, or background STORE check) does not wipe
   // the user's chosen object or typed partial-archive amount.
@@ -1677,6 +1712,10 @@ function renderFilteredObjects(){
     const sel=grid.querySelector(`[data-object-id="${CSS.escape(selectedObjectId)}"]`);
     if(sel){sel.classList.add('selected');const ai=sel.querySelector('.coin-amount input');if(ai)ai.disabled=false;}
   }
+}
+function loadMoreObjects(){
+  wizardRenderedCount+=WIZARD_PAGE_SIZE;
+  renderFilteredObjects();
 }
 
 async function startWizard(){
@@ -2051,6 +2090,7 @@ async function loadWizardObjects(targetAddress){
     return;
   }
   wizardObjectsLoaded=true;
+  wizardRenderedCount=0;
   grid.innerHTML='<div class="chain-empty loading">Loading your Mainnet objects…</div>';
   const client=window.theArchiveWallet.dAppKit.getClient("mainnet");
   Promise.all([
@@ -2081,6 +2121,7 @@ async function loadWizardObjects(targetAddress){
     const indexerOnlyIds=[...new Set((indexed?.objects||[]).map(o=>String(o.objectId||'').toLowerCase()))].filter(id=>!rpcIds.has(id));
     const deletedIndexerIds=new Set();
     if(indexerOnlyIds.length){
+      grid.innerHTML=`<div class="chain-empty loading">Checking ${indexerOnlyIds.length} indexed object${indexerOnlyIds.length===1?'':'s'} against the chain…</div>`;
       await Promise.all(indexerOnlyIds.map(async(id)=>{
         try{
           await window.theArchiveTx.fetchObjectById(client,id);
@@ -2522,7 +2563,27 @@ function explainArchiveError(error){
   if(/object.*(not found|does not exist)|unknown object/.test(text))return 'The selected object could not be found on Mainnet. Refresh the object list and try again.';
   return raw&&raw.length<180?`Archive failed: ${raw}`:'Archive failed. Check the transaction details and try again.';
 }
-function showToast(t){toast.textContent=t;toast.style.display="block";clearTimeout(window.tt);window.tt=setTimeout(()=>toast.style.display="none",5000)}
+function humanizeError(t){
+  const raw=String(t||'').replace(/\s+/g,' ').trim();
+  const text=raw.toLowerCase();
+  if(!raw)return raw;
+  // Already a friendly sentence (contains spaces, no stack/code markers) -> pass through.
+  if(/\b(connect|wallet|object|archiv|network|chain|deleted|cancel|reject|search|filter|load|try|enter|valid|found|sui)\b/.test(text) && !/\b0x[0-9a-f]{4,}\b|at \w+|\.js:|\bcode\b|TypeError|Error:|rpc|graphql|fetch\(/.test(text))return raw;
+  if(/user rejected|user denied|rejected|cancelled|canceled|closed|window/.test(text))return 'Action cancelled in the wallet.';
+  if(/failed to fetch|network|timeout|econn|enotfound|dns|offline/.test(text))return 'Cannot reach the Sui network. Check your connection and try again.';
+  if(/rate.?limit|too many request|429|throttl/.test(text))return 'The network is busy right now. Please wait a moment and try again.';
+  if(/not found|does not exist|unknown object|deleted|no object/.test(text))return 'That object is no longer on the Sui chain.';
+  if(/store ability|without store|no store/.test(text))return 'This object cannot be archived: its type lacks the store ability.';
+  if(/kiosk|locked|transferpolicy/.test(text))return 'This item is locked in a Kiosk and cannot be archived directly.';
+  if(/insufficient|not enough|balance/.test(text))return 'Not enough balance to cover the transaction.';
+  if(/gas/.test(text))return 'The transaction could not be paid for (gas). Try again or use a different account.';
+  if(/timeout|timed out/.test(text))return 'The request timed out. Please try again.';
+  if(/wallet|provider|dappkit|client/.test(text))return 'Wallet connection issue. Reconnect your wallet and try again.';
+  if(/module|abi|package|published/.test(text))return 'A smart-contract error occurred. Please report it.';
+  // Strip noisy code/stack fragments from otherwise-technical messages.
+  return raw.replace(/\s+at\s+[\w./<>()-]+:\d+:\d+/g,'').replace(/^Error:\s*/i,'').slice(0,160)||raw;
+}
+function showToast(t){const msg=humanizeError(t);toast.textContent=msg;toast.style.display="block";clearTimeout(window.tt);window.tt=setTimeout(()=>toast.style.display="none",5000)}
 // Locally uploaded "final image" (data URL). When set, it overrides the
 // option-based hero preview on step 2. On-chain storage still uses the default
 // GitHub PNG (the contract can't store a local file), but the preview reflects
