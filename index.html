@@ -2073,6 +2073,31 @@ async function loadWizardObjects(targetAddress){
         type:existing.type||object.type,
       }:object);
     }
+    // Objects reported by the third-party indexer but NOT by the live RPC scan
+    // may already be deleted on-chain (indexers lag behind the chain). Probe
+    // those indexer-only objects so a deleted one is flagged greyed instead of
+    // shown as a live, archivable object.
+    const rpcIds=new Set((rpcObjects||[]).map(o=>String(o.objectId||'').toLowerCase()));
+    const indexerOnlyIds=[...new Set((indexed?.objects||[]).map(o=>String(o.objectId||'').toLowerCase()))].filter(id=>!rpcIds.has(id));
+    const deletedIndexerIds=new Set();
+    if(indexerOnlyIds.length){
+      await Promise.all(indexerOnlyIds.map(async(id)=>{
+        try{
+          await window.theArchiveTx.fetchObjectById(client,id);
+        }catch(error){
+          const text=String(error?.message||error||'').toLowerCase();
+          if(/not found|does not exist|unknown object|deleted|no object|metadata is unavailable|could not load|not exist|gone|removed|object is null|not be found/i.test(text)){
+            deletedIndexerIds.add(id);
+          }
+        }
+      }));
+    }
+    // Flag indexer-only objects confirmed gone on-chain as deleted so they
+    // render greyed and are hidden when 'Hide unarchivable' is ON.
+    for(const id of deletedIndexerIds){
+      const obj=byId.get(id);
+      if(obj)obj.deleted=true;
+    }
     const manualObjects=wizardObjects.filter(object=>object.manual);
     const manualIds=new Set(manualObjects.map(object=>object.objectId));
     // Manually added objects must still be valid: if the object was already
