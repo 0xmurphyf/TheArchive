@@ -191,7 +191,6 @@ h1{font-size:clamp(52px,8vw,112px);line-height:.87;margin:24px 0 46px;letter-spa
 .object-grid .option.is-deleted{opacity:.45;filter:grayscale(1);border-color:#5a5a5a!important;cursor:not-allowed}
 .object-grid .option.is-deleted .object-thumb{opacity:.5}
 .object-count{margin:10px 2px 0;font:600 11px "Courier New",monospace;letter-spacing:.08em;color:#b9a18f;text-transform:uppercase}
-.object-loadmore{display:flex;justify-content:center;margin:14px 0 4px}
 .object-alert{position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:28px;height:28px;border:1px solid #b86b5d;border-radius:50%;background:#17110f;color:#e7a08e;font-size:15px;line-height:1}
 .object-alert[title]{cursor:help}
 .object-state-warning{display:block;margin-top:5px;padding:5px 7px;background:#3a1b18;color:#ffd1c5;border:1px solid #b86b5d;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-kiosk{display:block;margin-top:5px;padding:5px 7px;background:#3b2a16;color:#ffd79b;border:1px solid #c48a45;font:700 10px "Courier New",monospace;letter-spacing:.12em;text-align:center}.object-state-warning a,.object-state-kiosk a{color:inherit;text-decoration:underline;text-underline-offset:2px}
@@ -521,8 +520,9 @@ body.wallet-open{overflow:hidden}
       <h2>Choose an object</h2>
       <p>Select an object currently under your full control to permanently freeze.<br><strong>Once frozen, it will be removed from your ownership and can never be recovered.</strong></p>
       <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" onclick="refreshWizardObjects()">Scan and Refresh</button><button class="btn toggle-btn" type="button" id="hideUnarchivableBtn" aria-pressed="true" onclick="toggleHideUnarchivable(this)">Hide unarchivable: ON</button></div>
+      <div class="object-count" id="objectCount" hidden></div>
       <div class="object-controls">
-        <input type="text" id="objectSearch" placeholder="Search by name or object ID…" oninput="wizardRenderedCount=0;renderFilteredObjects()">
+        <input type="text" id="objectSearch" placeholder="Search by name or object ID…" oninput="renderFilteredObjects()">
         <div class="filter-tabs" id="objectFilter">
           <button class="filter-tab selected" data-kind="all" onclick="setObjectFilter('all',this)">All</button>
           <button class="filter-tab" data-kind="nft" onclick="setObjectFilter('nft',this)">NFT</button>
@@ -534,8 +534,6 @@ body.wallet-open{overflow:hidden}
         <button class="btn" type="button" id="loadObjectByIdBtn" onclick="loadObjectById()">Add Object ID</button>
       </div>
       <div class="object-grid" id="objectGrid"><div class="chain-empty">Connect a wallet to load your Mainnet objects.</div></div>
-      <div class="object-count" id="objectCount" hidden></div>
-      <div class="object-loadmore" id="objectLoadMore" hidden><button class="btn" type="button" onclick="loadMoreObjects()">Load more</button></div>
       <div class="step-footer"><button class="btn primary" id="objectNext" onclick="nextStep()" disabled>Continue</button></div>
     </div>
 
@@ -1425,9 +1423,6 @@ let wizardFilter='all';
 let wizardHideUnarchivable=true; // when true, hide objects that cannot be archived (NO STORE / SUI / Kiosk / special ownership)
 let wizardCollection=null;
 let wizardFocusedObjectId=null;
-// Pagination for large wallets: only render the first page of cards at a time.
-const WIZARD_PAGE_SIZE=60;
-let wizardRenderedCount=0;
 let lastWizardWalletAddress=null;
 function handleWalletChanged(connection){
   const address=String(connection?.address||'').toLowerCase();
@@ -1494,7 +1489,6 @@ function setObjectFilter(kind,el){
   if(wizardObjects.filter(o=>!isSuiCoin(o)).length<=1)return;
   wizardFilter=kind;
   wizardCollection=null;
-  wizardRenderedCount=0;
   document.querySelectorAll('#objectFilter .filter-tab').forEach(x=>x.classList.remove('selected'));
   el.classList.add('selected');
   renderFilteredObjects();
@@ -1526,7 +1520,6 @@ function objectCannotContinue(o){
 }
 function toggleHideUnarchivable(btn){
   wizardHideUnarchivable=!wizardHideUnarchivable;
-  wizardRenderedCount=0;
   if(btn){
     btn.classList.toggle('off',!wizardHideUnarchivable);
     btn.textContent=wizardHideUnarchivable?'Hide unarchivable: ON':'Hide unarchivable: OFF';
@@ -1545,8 +1538,8 @@ function objectCollection(o){
     cover:collection?.cover_url||o.imageUrl||'',
   };
 }
-function openObjectCollection(key){wizardCollection=key;wizardRenderedCount=0;renderFilteredObjects()}
-function closeObjectCollection(){wizardCollection=null;wizardRenderedCount=0;renderFilteredObjects()}
+function openObjectCollection(key){wizardCollection=key;renderFilteredObjects()}
+function closeObjectCollection(){wizardCollection=null;renderFilteredObjects()}
 function appendObjectCard(grid,obj,focused=false){
   const label=obj.name||obj.type.split('::').pop();
   const kind=obj.isCoin?'COIN':'OBJ';
@@ -1613,7 +1606,6 @@ function renderFilteredObjects(){
   const grid=document.getElementById('objectGrid');
   if(!grid)return;
   const countBar=document.getElementById('objectCount');
-  const loadMore=document.getElementById('objectLoadMore');
   const filterTabs=document.getElementById('objectFilter');
   if(filterTabs){
     const showFilters=wizardObjects.filter(o=>!isSuiCoin(o)).length>1;
@@ -1640,24 +1632,14 @@ function renderFilteredObjects(){
   const hiddenByFilter=total-list.length;
   if(!total){
     if(countBar){countBar.hidden=true;}
-    if(loadMore){loadMore.hidden=true;}
     grid.innerHTML='<div class="chain-empty">No selectable objects found in this wallet.</div>';
     return;
   }
   if(!list.length){
     if(countBar){countBar.hidden=true;}
-    if(loadMore){loadMore.hidden=true;}
     grid.innerHTML='<div class="chain-empty">No objects match your filters or search.</div>';
     return;
   }
-  // Pagination: render only the first WIZARD_PAGE_SIZE cards (plus the focused
-  // object). "Load more" appends the next page. wizardRenderedCount tracks how
-  // many of `list` are currently shown; reset to the page size on each full
-  // re-render (filter/search/refresh) but not when appending.
-  const renderFull=wizardRenderedCount===0||wizardRenderedCount>list.length;
-  if(renderFull)wizardRenderedCount=WIZARD_PAGE_SIZE;
-  wizardRenderedCount=Math.min(wizardRenderedCount,list.length);
-  const page=list.slice(0,wizardRenderedCount);
   grid.innerHTML='';
   if(wizardScanIncomplete){
     const notice=document.createElement('div');
@@ -1673,9 +1655,9 @@ function renderFilteredObjects(){
     back.onclick=closeObjectCollection;
     grid.appendChild(back);
   }
-  const focusedObject=(wizardFocusedObjectId?page.find(o=>o.objectId===wizardFocusedObjectId):null)||(wizardFocusedObjectId?list.find(o=>o.objectId===wizardFocusedObjectId):null);
+  const focusedObject=wizardFocusedObjectId?list.find(o=>o.objectId===wizardFocusedObjectId):null;
   if(focusedObject)appendObjectCard(grid,focusedObject,true);
-  const nfts=page.filter(o=>objectKind(o)==='nft' && o.objectId!==wizardFocusedObjectId);
+  const nfts=list.filter(o=>objectKind(o)==='nft' && o.objectId!==wizardFocusedObjectId);
   if(!wizardCollection && nfts.length){
     const groups=new Map();
     for(const obj of nfts){
@@ -1693,7 +1675,7 @@ function renderFilteredObjects(){
       grid.appendChild(card);
     }
   }
-  const otherObjects=(wizardCollection?page:page.filter(o=>objectKind(o)!=='nft')).filter(o=>o.objectId!==wizardFocusedObjectId);
+  const otherObjects=(wizardCollection?list:list.filter(o=>objectKind(o)!=='nft')).filter(o=>o.objectId!==wizardFocusedObjectId);
   for(const obj of otherObjects)appendObjectCard(grid,obj);
   if(wizardCollection && !otherObjects.length && !focusedObject)grid.innerHTML+='<div class="chain-empty">No NFTs found in this collection.</div>';
   // Count bar: "Showing X of Y" plus a hint when filters hide the rest.
@@ -1704,7 +1686,6 @@ function renderFilteredObjects(){
     countBar.textContent=text;
     countBar.hidden=false;
   }
-  if(loadMore){loadMore.hidden=wizardRenderedCount>=list.length;if(loadMore.firstElementChild)loadMore.firstElementChild.textContent=`Load more (${list.length-wizardRenderedCount} left)`;}
   // Re-apply the current selection + coin amount after rebuilding the grid,
   // so a re-render (filter, search, or background STORE check) does not wipe
   // the user's chosen object or typed partial-archive amount.
@@ -1712,10 +1693,6 @@ function renderFilteredObjects(){
     const sel=grid.querySelector(`[data-object-id="${CSS.escape(selectedObjectId)}"]`);
     if(sel){sel.classList.add('selected');const ai=sel.querySelector('.coin-amount input');if(ai)ai.disabled=false;}
   }
-}
-function loadMoreObjects(){
-  wizardRenderedCount+=WIZARD_PAGE_SIZE;
-  renderFilteredObjects();
 }
 
 async function startWizard(){
@@ -2090,7 +2067,6 @@ async function loadWizardObjects(targetAddress){
     return;
   }
   wizardObjectsLoaded=true;
-  wizardRenderedCount=0;
   grid.innerHTML='<div class="chain-empty loading">Loading your Mainnet objects…</div>';
   const client=window.theArchiveWallet.dAppKit.getClient("mainnet");
   Promise.all([
