@@ -569,6 +569,7 @@ body.wallet-open{overflow:hidden}
       <div style="margin-top:22px">
         <div class="fee-row"><span>Object Name</span><span id="confirmObjectName">—</span></div>
         <div class="fee-row"><span>Object ID</span><span id="confirmObjectId">—</span></div>
+        <div class="fee-row" id="confirmKioskRow" hidden><span>Kiosk status</span><span style="color:#ffd79b">🔒 Locked in Kiosk — archive disabled</span></div>
         <div class="fee-row"><span>Final Image</span><span id="confirmHeroCell">—</span></div>
         <div class="fee-row"><span>Message</span><span id="confirmMessageCell">—</span></div>
         <div class="fee-row"><span>Signature</span><span id="confirmSignatureCell">—</span></div>
@@ -1498,19 +1499,17 @@ function setObjectFilter(kind,el){
 function objectCannotContinue(o){
   if(!o || !o.objectId)return false;
   if(Boolean(o.noStore))return true;
-  if(Boolean(o.deleted))return true; // chain-confirmed gone -> treat as unarchivable
+  if(Boolean(o.deleted))return true;
   if(isSuiCoin(o))return true;
-  // Kiosk / locked items. We cannot rely solely on the `inKiosk`/`kiosk` flags
-  // because those are only attached when the wallet-side kiosk field scan
-  // succeeds; objects that arrive only from the indexer (or after an
-  // incomplete scan) only carry `indexer.kioskId` or an ownership status.
-  // Cover all of those so "Hide unarchivable" actually hides them.
+  // Kiosk items are shown in the grid but cannot be archived directly.
+  // They are selectable; the archive button is disabled in the confirmation
+  // step instead of hiding the object entirely.
   const inKiosk=Boolean(
     o.kioskId||o.kioskOwnerCapId||o.kiosk||o.ownerObjectId||o.inKiosk||
     o.indexer?.kioskId||o.ownershipStatus==='Locked in Kiosk'||
     o.ownershipStatus==='In Kiosk'||o.ownershipStatus==='Personal Kiosk'
   );
-  if(inKiosk)return true;
+  if(inKiosk)return false;
   const special=Boolean(
     o.ownerObjectId||o.objectStatus==='ObjectOwned'||o.ownershipStatus==='ObjectOwned'||
     o.ownershipStatus==='Special'||o.ownershipStatus==='Listed'||o.specialOwnership
@@ -1822,8 +1821,9 @@ async function nextStep(){
   renderStep();
 }
 function prevStep(){currentStep--; if(currentStep===4)currentStep--; renderStep()}
+let selectedObjectIsKiosk=false;
 function selectObject(el){
-  if(el.classList.contains('is-deleted'))return; // chain-confirmed gone -> not selectable
+  if(el.classList.contains('is-deleted'))return;
   document.querySelectorAll('[data-step="1"] .option').forEach(x=>x.classList.remove("selected"));
   el.classList.add("selected");
   document.querySelectorAll('[data-step="1"] .coin-amount input').forEach(input=>{
@@ -1832,6 +1832,7 @@ function selectObject(el){
   selectedObjectId=el.dataset.objectId||null;
   selectedObjectType=el.dataset.type||null;
   selectedGasPayment=null;
+  selectedObjectIsKiosk=el.dataset.inKiosk==='1';
   setConfirmObject();
   objectNext.disabled=!selectedObjectId;
 }
@@ -1841,7 +1842,8 @@ function selectObject(el){
 function setConfirmObject(){
   const nameEl=document.getElementById("confirmObjectName");
   const idEl=document.getElementById("confirmObjectId");
-  if(!selectedObjectId){ if(nameEl)nameEl.textContent="—"; if(idEl)idEl.textContent="—"; return; }
+  const kioskRow=document.getElementById("confirmKioskRow");
+  if(!selectedObjectId){ if(nameEl)nameEl.textContent="—"; if(idEl)idEl.textContent="—"; if(kioskRow)kioskRow.hidden=true; return; }
   const card=document.querySelector('[data-step="1"] .option.selected');
   const name=card?.dataset.name||"";
   const isCoin=card?.dataset.isCoin==="1";
@@ -1861,6 +1863,10 @@ function setConfirmObject(){
     }
   }
   if(idEl) idEl.innerHTML=idHtml;
+  if(kioskRow){
+    kioskRow.hidden=!selectedObjectIsKiosk;
+  }
+  if(typeof validateConfirm==='function')validateConfirm();
 }
 function selectOption(el,step){
   document.querySelectorAll(`[data-step="${step}"] .option`).forEach(x=>x.classList.remove("selected"));
@@ -1919,7 +1925,16 @@ function renderStepImagePreview(){
   preview.hidden=true;
   preview.innerHTML="";
 }
-function validateConfirm(){archiveBtn.disabled=confirmText.value.trim().toUpperCase()!=="ARCHIVE"}
+function validateConfirm(){
+  const kioskBlocked = Boolean(selectedObjectIsKiosk);
+  const typedOk = confirmText.value.trim().toUpperCase() === "ARCHIVE";
+  archiveBtn.disabled = !typedOk || kioskBlocked;
+  if(kioskBlocked){
+    archiveBtn.textContent = 'LOCKED IN KIOSK';
+  } else {
+    archiveBtn.textContent = 'ARCHIVE FOREVER';
+  }
+}
 function populateConfirmSummary(){
   const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value||"—";};
   const msgEl=document.querySelector('[data-step="3"] textarea');
