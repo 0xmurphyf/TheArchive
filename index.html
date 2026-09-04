@@ -576,6 +576,7 @@ body.wallet-open{overflow:hidden}
         <div class="fee-row"><span>Archive fee</span><span id="confirmArchiveFee">Loading…</span></div>
         <div class="fee-row"><span>Estimated gas</span><span id="confirmGasEstimate">—</span></div>
         <div class="fee-row fee-total"><span>Estimated total</span><span id="confirmTotalCost">—</span></div>
+        <div class="fee-row" id="confirmTakeoutRow" hidden><span>Taken out?</span><button type="button" class="btn" id="takeoutBtn" onclick="takeObjectFromKioskClicked()" disabled>Take Out to Wallet</button></div>
       </div>
       <div class="hero-preview" id="confirmHeroPreview" hidden></div>
 
@@ -1836,6 +1837,10 @@ function setConfirmObject(){
   if(idEl) idEl.innerHTML=idHtml;
   if(kioskRow){
     kioskRow.hidden=!selectedObjectIsKiosk;
+    const takeoutRow=document.getElementById("confirmTakeoutRow");
+    const takeoutBtn=document.getElementById("takeoutBtn");
+    if(takeoutRow) takeoutRow.hidden=!selectedObjectIsKiosk;
+    if(takeoutBtn) takeoutBtn.disabled=!selectedObjectIsKiosk || !window.theArchiveTx?.takeObjectFromKiosk;
   }
   if(typeof validateConfirm==='function')validateConfirm();
 }
@@ -1904,6 +1909,46 @@ function validateConfirm(){
     archiveBtn.textContent = 'LOCKED IN KIOSK';
   } else {
     archiveBtn.textContent = 'ARCHIVE FOREVER';
+  }
+}
+async function takeObjectFromKioskClicked(){
+  const card=document.querySelector('[data-step="1"] .option.selected');
+  if(!card){showToast('Select an object first');return;}
+  if(!window.theArchiveTx?.takeObjectFromKiosk){showToast('Take-out tool is not available');return;}
+  if(!window.theArchiveWallet?.dAppKit){showToast('Connect your wallet first');return;}
+  const address=window.theArchiveWallet.dAppKit.getCurrentAddress()?.address||window.theArchiveWallet.dAppKit.currentAccount||'';
+  if(!address){showToast('No active wallet address');return;}
+  const objectId=card.dataset.objectId||selectedObjectId;
+  const nftType=window.theArchiveTx.extractKioskItemType(card.dataset.type||selectedObjectType||'');
+  const kioskId=card.dataset.kioskId||card.dataset.kioskOwnerCapId||'';
+  const kioskOwnerCapId=card.dataset.kioskOwnerCapId||'';
+  if(!nftType||!kioskId||!kioskOwnerCapId){showToast('Missing kiosk/target info for this object');return;}
+  try{
+    takeoutBtn.disabled=true;
+    takeoutBtn.textContent='Signing…';
+    const result=await window.theArchiveTx.takeObjectFromKiosk({
+      client: window.theArchiveWallet.client,
+      dAppKit: window.theArchiveWallet.dAppKit,
+      objectId,
+      nftType,
+      kioskId,
+      kioskOwnerCapId,
+      receiver: address,
+    });
+    showToast('Take-out tx submitted: ' + (result?.digest || ''));
+    if(result?.digest){
+      setTimeout(()=>{
+        if(typeof startWizard==='function')startWizard();
+      }, 2000);
+    } else {
+      takeoutBtn.disabled=false;
+      takeoutBtn.textContent='Take Out to Wallet';
+    }
+  }catch(err){
+    console.error(err);
+    showToast(err?.message || 'Take-out failed');
+    takeoutBtn.disabled=false;
+    takeoutBtn.textContent='Take Out to Wallet';
   }
 }
 function populateConfirmSummary(){

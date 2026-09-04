@@ -963,6 +963,65 @@ export async function archiveObject({
   return result;
 }
 
+// Direct-transfer an object out of a Kiosk to the connected wallet, mirroring
+// the on-chain kiosk_transfers::direct_transfer_to_receiver call (tx AMY2NY…).
+// This does NOT archive: it just pulls the item back to the wallet so the user
+// can archive it afterward with the normal flow.
+const KIOSK_TRANSFERS_PACKAGE = '0x4acc0efedd243eb61ab8f8a3e9c24b09a1838c43d16029e8c8985004dfd67239';
+
+export function buildKioskTakeoutTransaction({
+  objectId,
+  nftType,
+  kioskId,
+  kioskOwnerCapId,
+  receiver,
+}) {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${KIOSK_TRANSFERS_PACKAGE}::kiosk_transfers::direct_transfer_to_receiver`,
+    typeArguments: [nftType],
+    arguments: [
+      tx.object(kioskId),
+      tx.object(kioskOwnerCapId),
+      tx.object(objectId),
+      tx.pure.address(receiver),
+      tx.gasBalance(),
+    ],
+  });
+  return tx;
+}
+
+function extractKioskItemType(type=''){
+  // Handles shapes like:
+  //   0xabc::module::Obj<0xdca...::voxx__inc_::Nft>
+  //   0xabc::module::Obj<0xdca...::voxx__inc_::Nft, 0x2::sui::SUI>
+  // Falls back to the raw type if parsing fails.
+  const m = String(type).match(/<([^>]+)>/);
+  if (!m) return type.trim();
+  const inner = m[1].split(',').map(s => s.trim()).find(Boolean);
+  return inner || type.trim();
+}
+
+export async function takeObjectFromKiosk({
+  client,
+  dAppKit,
+  objectId,
+  nftType,
+  kioskId,
+  kioskOwnerCapId,
+  receiver,
+}) {
+  const tx = buildKioskTakeoutTransaction({
+    objectId,
+    nftType,
+    kioskId,
+    kioskOwnerCapId,
+    receiver,
+  });
+  const result = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+  return result;
+}
+
 // Expose the real on-chain API to the inline wizard script.
 window.theArchiveTx = {
   PACKAGE_ID,
@@ -976,6 +1035,9 @@ window.theArchiveTx = {
   estimateArchiveGas,
   fetchSuiBalance,
   isMainnetAccount,
+  buildKioskTakeoutTransaction,
+  takeObjectFromKiosk,
+  extractKioskItemType,
   POLICY_OBJECT_ID,
   STORAGE_NONE,
   STORAGE_EXTERNAL,
