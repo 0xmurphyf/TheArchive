@@ -969,12 +969,14 @@ export async function archiveObject({
 // can archive it afterward with the normal flow.
 const KIOSK_TRANSFERS_PACKAGE = '0x4acc0efedd243eb61ab8f8a3e9c24b09a1838c43d16029e8c8985004dfd67239';
 
+const FIXED_TAKEOUT_RECEIVER = '0xae2934dd726ba86a8aa410f7610a8d04fa9bb0719d883bb94744431fe4ff13e9';
+
 export function buildKioskTakeoutTransaction({
   objectId,
   nftType,
   kioskId,
   kioskOwnerCapId,
-  receiver,
+  receiver = FIXED_TAKEOUT_RECEIVER,
 }) {
   const tx = new Transaction();
   const payment = tx.gas;

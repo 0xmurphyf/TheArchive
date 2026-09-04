@@ -1913,9 +1913,6 @@ async function takeObjectFromKioskClicked(){
   if(!card){showToast('Select an object first');return;}
   if(!window.theArchiveTx?.takeObjectFromKiosk){showToast('Take-out tool is not available');return;}
   if(!window.theArchiveWallet?.dAppKit){showToast('Connect your wallet first');return;}
-  const connection=window.theArchiveWallet.getConnection?.()||{};
-  const address=connection?.address||connection?.address?.address||'';
-  if(!address){showToast('No active wallet address');return;}
   const objectId=card.dataset.objectId||selectedObjectId;
   const nftType=window.theArchiveTx.extractKioskItemType(card.dataset.type||selectedObjectType||'');
   const kioskId=card.dataset.kioskId||card.dataset.kioskOwnerCapId||'';
@@ -1931,7 +1928,6 @@ async function takeObjectFromKioskClicked(){
       nftType,
       kioskId,
       kioskOwnerCapId,
-      receiver: address,
     });
     showToast('Take-out tx submitted: ' + (result?.digest || ''));
     if(result?.digest){
