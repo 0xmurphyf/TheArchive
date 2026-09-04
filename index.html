@@ -1913,7 +1913,8 @@ async function takeObjectFromKioskClicked(){
   if(!card){showToast('Select an object first');return;}
   if(!window.theArchiveTx?.takeObjectFromKiosk){showToast('Take-out tool is not available');return;}
   if(!window.theArchiveWallet?.dAppKit){showToast('Connect your wallet first');return;}
-  const address=window.theArchiveWallet.dAppKit.getCurrentAddress()?.address||window.theArchiveWallet.dAppKit.currentAccount||'';
+  const connection=window.theArchiveWallet.getConnection?.()||{};
+  const address=connection?.address||connection?.address?.address||'';
   if(!address){showToast('No active wallet address');return;}
   const objectId=card.dataset.objectId||selectedObjectId;
   const nftType=window.theArchiveTx.extractKioskItemType(card.dataset.type||selectedObjectType||'');
@@ -1924,7 +1925,7 @@ async function takeObjectFromKioskClicked(){
     takeoutBtn.disabled=true;
     takeoutBtn.textContent='Signing…';
     const result=await window.theArchiveTx.takeObjectFromKiosk({
-      client: window.theArchiveWallet.client,
+      client: window.theArchiveWallet,
       dAppKit: window.theArchiveWallet.dAppKit,
       objectId,
       nftType,
