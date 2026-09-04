@@ -1759,20 +1759,6 @@ async function nextStep(){
       window.alert('SUI coin cannot be archived through The Archive. Only NFTs and other objects can be permanently sealed here.');
       return;
     }
-    const scanInKiosk=Boolean(
-      selectedCard.dataset.kioskId||
-      selectedCard.dataset.kioskOwnerCapId||
-      selectedCard.dataset.inKiosk==='1'||
-      selectedModel?.kioskId||
-      selectedModel?.kioskOwnerCapId||
-      selectedModel?.kiosk||
-      selectedModel?.ownerObjectId||
-      selectedModel?.ownershipStatus==='Locked in Kiosk'
-    );
-    if(scanInKiosk){
-      window.alert('This object lives in a Kiosk and cannot be archived from here. Take it out to your wallet first via https://kiosk.voxxinc.xyz, then archive it.');
-      return;
-    }
     const scanSpecial=Boolean(
       selectedCard.dataset.specialOwnership==='1'||
       selectedModel?.ownerObjectId||
@@ -1783,21 +1769,6 @@ async function nextStep(){
     );
     if(scanSpecial){
       window.alert('This object has special/listed ownership and cannot be archived from here. Resolve its ownership first, then try again.');
-      return;
-    }
-    const isKioskItem=Boolean(
-      selectedCard.dataset.kioskId||
-      selectedCard.dataset.kioskOwnerCapId||
-      selectedModel?.kioskId||
-      selectedModel?.kioskOwnerCapId||
-      selectedModel?.kiosk||
-      selectedModel?.ownerObjectId||
-      selectedModel?.ownershipStatus==='Locked in Kiosk'
-    );
-    const kioskId=selectedCard.dataset.kioskId||selectedModel?.kioskId||selectedModel?.indexer?.kioskId||'';
-    const kioskOwnerCapId=selectedCard.dataset.kioskOwnerCapId||selectedModel?.kioskOwnerCapId||'';
-    if(isKioskItem && (!kioskId || !kioskOwnerCapId)){
-      window.alert('This object is in a Kiosk, but its KioskOwnerCap could not be verified. Refresh your wallet objects before continuing.');
       return;
     }
     if(!window.theArchiveWallet?.dAppKit){
