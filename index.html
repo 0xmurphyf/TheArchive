@@ -534,7 +534,7 @@ body.wallet-open{overflow:hidden}
         <button class="btn" type="button" id="loadObjectByIdBtn" onclick="loadObjectById()">Add Object ID</button>
       </div>
       <div class="object-grid" id="objectGrid"><div class="chain-empty">Connect a wallet to load your Mainnet objects.</div></div>
-      <div class="step-footer"><button class="btn primary" id="objectNext" onclick="nextStep()" disabled>Continue</button></div>
+      <div class="step-footer"><button class="btn primary" id="objectNext" onclick="nextStep()" disabled>Continue</button><button type="button" class="btn" id="takeoutBtn" onclick="takeObjectFromKioskClicked()" disabled>Take Out to Wallet</button></div>
     </div>
 
     <div class="step" data-step="2">
@@ -576,7 +576,6 @@ body.wallet-open{overflow:hidden}
         <div class="fee-row"><span>Archive fee</span><span id="confirmArchiveFee">Loading…</span></div>
         <div class="fee-row"><span>Estimated gas</span><span id="confirmGasEstimate">—</span></div>
         <div class="fee-row fee-total"><span>Estimated total</span><span id="confirmTotalCost">—</span></div>
-        <div class="fee-row" id="confirmTakeoutRow" hidden><span>Taken out?</span><button type="button" class="btn" id="takeoutBtn" onclick="takeObjectFromKioskClicked()" disabled>Take Out to Wallet</button></div>
       </div>
       <div class="hero-preview" id="confirmHeroPreview" hidden></div>
 
@@ -1805,6 +1804,8 @@ function selectObject(el){
   selectedObjectType=el.dataset.type||null;
   selectedGasPayment=null;
   selectedObjectIsKiosk=el.dataset.inKiosk==='1';
+  const takeoutBtn=document.getElementById("takeoutBtn");
+  if(takeoutBtn) takeoutBtn.disabled=!selectedObjectIsKiosk;
   setConfirmObject();
   objectNext.disabled=!selectedObjectId;
 }
@@ -1837,10 +1838,6 @@ function setConfirmObject(){
   if(idEl) idEl.innerHTML=idHtml;
   if(kioskRow){
     kioskRow.hidden=!selectedObjectIsKiosk;
-    const takeoutRow=document.getElementById("confirmTakeoutRow");
-    const takeoutBtn=document.getElementById("takeoutBtn");
-    if(takeoutRow) takeoutRow.hidden=!selectedObjectIsKiosk;
-    if(takeoutBtn) takeoutBtn.disabled=!selectedObjectIsKiosk || !window.theArchiveTx?.takeObjectFromKiosk;
   }
   if(typeof validateConfirm==='function')validateConfirm();
 }
