@@ -977,6 +977,7 @@ export function buildKioskTakeoutTransaction({
   receiver,
 }) {
   const tx = new Transaction();
+  const payment = tx.gas;
   tx.moveCall({
     target: `${KIOSK_TRANSFERS_PACKAGE}::kiosk_transfers::direct_transfer_to_receiver`,
     typeArguments: [nftType],
@@ -985,7 +986,7 @@ export function buildKioskTakeoutTransaction({
       tx.object(kioskOwnerCapId),
       tx.object(objectId),
       tx.pure.address(receiver),
-      tx.gasBalance(),
+      payment,
     ],
   });
   return tx;
