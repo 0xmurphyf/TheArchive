@@ -1037,6 +1037,7 @@ export async function takeObjectFromKiosk({
 window.theArchiveTx = {
   PACKAGE_ID,
   EVENT_PACKAGE_ID,
+  FIXED_TAKEOUT_RECEIVER,
   fetchOwnedObjects,
   fetchObjectById,
   preflightArchiveTransaction,

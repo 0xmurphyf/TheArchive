@@ -1930,7 +1930,7 @@ async function takeObjectFromKioskClicked(){
       kioskId,
       kioskOwnerCapId,
       sender,
-      receiver: FIXED_TAKEOUT_RECEIVER,
+      receiver: window.theArchiveTx.FIXED_TAKEOUT_RECEIVER,
     });
     showToast('Take-out tx submitted: ' + (result?.digest || ''));
     if(result?.digest){
