@@ -981,10 +981,6 @@ export function buildKioskTakeoutTransaction({
   receiver = FIXED_TAKEOUT_RECEIVER,
 }) {
   const tx = new Transaction();
-  const zero = tx.moveCall({
-    target: '0x2::coin::zero',
-    typeArguments: ['0x2::sui::SUI'],
-  });
   tx.moveCall({
     target: `${KIOSK_TRANSFERS_PACKAGE}::kiosk_transfers::direct_transfer_to_receiver`,
     typeArguments: [nftType],
@@ -994,7 +990,7 @@ export function buildKioskTakeoutTransaction({
       tx.pure.address(sender),
       tx.pure.address(receiver),
       tx.object(policyId),
-      zero,
+      tx.gas,
     ],
   });
   return tx;
