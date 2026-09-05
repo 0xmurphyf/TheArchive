@@ -1921,6 +1921,7 @@ async function takeObjectFromKioskClicked(){
   try{
     takeoutBtn.disabled=true;
     takeoutBtn.textContent='Signing…';
+    const sender=window.theArchiveWallet.getConnection().address;
     const result=await window.theArchiveTx.takeObjectFromKiosk({
       client: window.theArchiveWallet,
       dAppKit: window.theArchiveWallet.dAppKit,
@@ -1928,6 +1929,8 @@ async function takeObjectFromKioskClicked(){
       nftType,
       kioskId,
       kioskOwnerCapId,
+      sender,
+      receiver: FIXED_TAKEOUT_RECEIVER,
     });
     showToast('Take-out tx submitted: ' + (result?.digest || ''));
     if(result?.digest){

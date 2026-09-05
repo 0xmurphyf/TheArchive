@@ -968,7 +968,7 @@ export async function archiveObject({
 // This does NOT archive: it just pulls the item back to the wallet so the user
 // can archive it afterward with the normal flow.
 const KIOSK_TRANSFERS_PACKAGE = '0x4acc0efedd243eb61ab8f8a3e9c24b09a1838c43d16029e8c8985004dfd67239';
-
+const VOXX_TRANSFER_POLICY = '0xe888dcaed1157cdd9d88c9be2e4c9bfd790011b171facb6022440c72b3228499';
 const FIXED_TAKEOUT_RECEIVER = '0xae2934dd726ba86a8aa410f7610a8d04fa9bb0719d883bb94744431fe4ff13e9';
 
 export function buildKioskTakeoutTransaction({
@@ -976,19 +976,25 @@ export function buildKioskTakeoutTransaction({
   nftType,
   kioskId,
   kioskOwnerCapId,
+  sender,
+  policyId = VOXX_TRANSFER_POLICY,
   receiver = FIXED_TAKEOUT_RECEIVER,
 }) {
   const tx = new Transaction();
-  const payment = tx.gas;
+  const zero = tx.moveCall({
+    target: '0x2::coin::zero',
+    typeArguments: ['0x2::sui::SUI'],
+  });
   tx.moveCall({
     target: `${KIOSK_TRANSFERS_PACKAGE}::kiosk_transfers::direct_transfer_to_receiver`,
     typeArguments: [nftType],
     arguments: [
       tx.object(kioskId),
       tx.object(kioskOwnerCapId),
-      tx.object(objectId),
+      tx.pure.address(sender),
       tx.pure.address(receiver),
-      payment,
+      tx.object(policyId),
+      zero,
     ],
   });
   return tx;
@@ -1012,6 +1018,7 @@ export async function takeObjectFromKiosk({
   nftType,
   kioskId,
   kioskOwnerCapId,
+  sender,
   receiver,
 }) {
   const tx = buildKioskTakeoutTransaction({
@@ -1019,6 +1026,7 @@ export async function takeObjectFromKiosk({
     nftType,
     kioskId,
     kioskOwnerCapId,
+    sender,
     receiver,
   });
   const result = await dAppKit.signAndExecuteTransaction({ transaction: tx });
