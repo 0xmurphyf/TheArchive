@@ -2576,9 +2576,9 @@ function humanizeError(t){
   if(/user rejected|user denied|rejected|cancelled|canceled|closed|window/.test(text))return 'Action cancelled in the wallet.';
   if(/failed to fetch|network|timeout|econn|enotfound|dns|offline/.test(text))return 'Cannot reach the Sui network. Check your connection and try again.';
   if(/rate.?limit|too many request|429|throttl/.test(text))return 'The network is busy right now. Please wait a moment and try again.';
-  if(/not found|does not exist|unknown object|deleted|no object/.test(text))return 'That object is no longer on the Sui chain.';
-  if(/store ability|without store|no store/.test(text))return 'This object cannot be archived: its type lacks the store ability.';
-  if(/kiosk|locked|transferpolicy/.test(text))return 'This item is locked in a Kiosk and cannot be archived directly.';
+  if(/kiosk.*owner.*signer|signer.*kiosk.*owner|not signed by the correct sender|KioskOwnerCap.*owner/i)return 'This Kiosk cannot be taken out from the currently connected wallet. Switch to the wallet that owns the KioskOwnerCap and try again.';
+  if(/not found|does not exist|unknown object|deleted|no object/i)return 'That object is no longer on the Sui chain.';
+  if(/store ability|without store|no store/i)return 'This object cannot be archived: its type lacks the store ability.';
   if(/insufficient|not enough|balance/.test(text))return 'Not enough balance to cover the transaction.';
   if(/gas/.test(text))return 'The transaction could not be paid for (gas). Try again or use a different account.';
   if(/timeout|timed out/.test(text))return 'The request timed out. Please try again.';
