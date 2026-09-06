@@ -1942,7 +1942,7 @@ async function takeObjectFromKioskClicked(){
       takeoutBtn.textContent='Take Out to Wallet';
     }
   }catch(err){
-    console.error(err);
+    console.error('Take-out raw error:', err);
     showToast(err?.message || 'Take-out failed');
     takeoutBtn.disabled=false;
     takeoutBtn.textContent='Take Out to Wallet';
